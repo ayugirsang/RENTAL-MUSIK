@@ -58,6 +58,19 @@ git push -u origin main
 
 File `.env` dan `node_modules` tidak dikirim ke GitHub. Jangan menaruh `service_role` key di repository atau di browser.
 
+## Deploy menjadi link publik
+
+GitHub menyimpan kode, sedangkan server Node.js perlu dijalankan di hosting. Repository ini sudah menyediakan `render.yaml` untuk Render.
+
+1. Buka [Render](https://render.com) dan masuk menggunakan GitHub.
+2. Pilih **New > Blueprint**.
+3. Pilih repository `ayugirsang/RENTAL-MUSIK`.
+4. Isi environment variable `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY` dari Supabase.
+5. Klik **Apply** dan tunggu proses build selesai.
+6. Salin URL `onrender.com` yang diberikan Render.
+
+Render akan menjalankan `npm ci`, kemudian `npm start`, dan otomatis melakukan deploy ulang setiap ada push ke branch `main`.
+
 ## Keamanan Supabase
 
 `schema.sql` saat ini berisi policy demo untuk aplikasi akademik tanpa login. Sebelum deployment publik, ganti policy tersebut dengan RLS berbasis autentikasi Supabase dan batasi akses setiap pengguna sesuai kebutuhan.

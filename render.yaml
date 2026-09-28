@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: ritme-rental-musik
+    env: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: PORT
+        value: 10000
