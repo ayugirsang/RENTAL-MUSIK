@@ -1,0 +1,20 @@
+{
+  "name": "tugas-pengkodean",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "check": "node --check app.js",
+    "test": "node --check app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "dotenv": "^18.0.4",
+    "express": "^5.2.1"
+  }
+}

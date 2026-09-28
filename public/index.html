@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d1524">
+  <title>Ritme | Akuntansi Rental Musik</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=blue-black-2">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#dashboard" aria-label="Ritme, halaman ringkasan">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 22V10l7 8 5-11v17l7-8"/></svg></span>
+        <span><strong>ritme</strong><small>RENTAL & ACCOUNTING</small></span>
+      </a>
+      <div class="side-caption">RUANG KERJA</div>
+      <nav class="main-nav" aria-label="Navigasi utama">
+        <button class="nav-link is-active" type="button" data-view="dashboard"><span class="nav-icon">◫</span>Ringkasan</button>
+        <button class="nav-link" type="button" data-view="transactions"><span class="nav-icon">⇄</span>Transaksi</button>
+        <button class="nav-link" type="button" data-view="reports"><span class="nav-icon">▤</span>Jurnal akuntansi</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="side-caption">PERIODE BERJALAN</div>
+        <div class="period-label"><span class="live-dot"></span><span id="current-month">Memuat periode</span></div>
+        <div class="sidebar-note">Pencatatan pendapatan denda keterlambatan.</div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div class="breadcrumb"><span>Usaha rental alat musik</span><span class="crumb-divider">/</span><strong id="page-label">Ringkasan</strong></div>
+        <div class="topbar-right"><span class="today-label" id="today-label"></span><button class="refresh-button" id="refresh-data" type="button" aria-label="Muat ulang data" title="Muat ulang data">↻</button><span class="avatar" aria-label="Administrator">AD</span></div>
+      </header>
+
+      <section class="view is-visible" id="view-dashboard" aria-labelledby="dashboard-title">
+        <div class="page-heading">
+          <div><div class="eyebrow">PUSAT KENDALI</div><h1 id="dashboard-title">Selamat datang kembali.</h1><p>Pantau pengembalian, denda, dan arus jurnal hari ini.</p></div>
+          <button class="button button-dark" type="button" data-go="transactions"><span aria-hidden="true">＋</span> Transaksi baru</button>
+        </div>
+        <div class="metric-grid">
+          <article class="metric metric-green"><div class="metric-top"><span>Pendapatan denda</span><span class="metric-icon">↗</span></div><strong id="metric-income">Rp0</strong><div class="metric-foot"><span class="metric-dot"></span>Akumulasi denda tercatat</div></article>
+          <article class="metric metric-paper"><div class="metric-top"><span>Penyewaan terlambat</span><span class="metric-icon icon-coral">⌁</span></div><strong id="metric-late">0</strong><div class="metric-foot">Belum dikembalikan melewati jadwal</div></article>
+          <article class="metric metric-paper"><div class="metric-top"><span>Alat sedang disewa</span><span class="metric-icon icon-yellow">♫</span></div><strong id="metric-rented">0</strong><div class="metric-foot">Unit aktif di luar inventaris</div></article>
+        </div>
+        <div class="dashboard-grid">
+          <section class="panel due-panel">
+            <div class="panel-heading"><div><div class="eyebrow">PERLU DITINDAKLANJUTI</div><h2>Jadwal pengembalian</h2></div><button class="text-button" type="button" data-go="transactions">Buka transaksi <span>→</span></button></div>
+            <div class="table-wrap"><table><thead><tr><th>PENYEWA</th><th>JATUH TEMPO</th><th>NILAI SEWA</th><th>STATUS</th></tr></thead><tbody id="due-table"><tr><td colspan="4" class="empty-cell">Memuat data...</td></tr></tbody></table></div>
+          </section>
+          <aside class="note-panel">
+            <div class="note-mark" aria-hidden="true">♫</div><div class="eyebrow">CATATAN AKUNTANSI</div><h2>Denda diakui saat pengembalian.</h2><p>Piutang denda dan pendapatan tercatat otomatis. Saat pembayaran diterima, jurnal memindahkan saldo piutang ke kas.</p><button class="text-button note-link" type="button" data-go="reports">Lihat jurnal <span>→</span></button>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view" id="view-transactions" aria-labelledby="transactions-title">
+        <div class="page-heading"><div><div class="eyebrow">OPERASIONAL</div><h1 id="transactions-title">Transaksi rental</h1><p>Kelola penyewaan, pengembalian, dan pembayaran denda.</p></div></div>
+        <div class="transaction-grid">
+          <section class="panel form-panel"><div class="panel-heading"><div><div class="eyebrow">01 / MULAI RENTAL</div><h2>Penyewaan baru</h2></div><span class="step-mark">01</span></div>
+            <form id="rental-form" class="form-stack">
+              <label class="field-label" for="rental-customer">Pelanggan <span class="required">*</span></label>
+              <div class="inline-field"><select id="rental-customer" required><option value="">Pilih pelanggan</option></select><button class="square-button" id="toggle-customer-form" type="button" aria-label="Tambah pelanggan" title="Tambah pelanggan">＋</button></div>
+              <div class="customer-create" id="customer-create" hidden>
+                <label class="field-label" for="customer-name">Nama pelanggan</label><input id="customer-name" name="nama" autocomplete="name" placeholder="Nama lengkap">
+                <div class="field-pair"><div><label class="field-label" for="customer-phone">Nomor HP</label><input id="customer-phone" name="no_hp" autocomplete="tel" placeholder="08xxxxxxxxxx"></div><div><label class="field-label" for="customer-address">Alamat</label><input id="customer-address" name="alamat" placeholder="Kota / alamat"></div></div>
+                <button class="button button-outline button-small" id="save-customer" type="button">Simpan pelanggan</button>
+              </div>
+              <div class="field-pair"><div><label class="field-label" for="rental-date">Tanggal sewa <span class="required">*</span></label><input id="rental-date" type="date" required></div><div><label class="field-label" for="planned-date">Rencana kembali <span class="required">*</span></label><input id="planned-date" type="date" required></div></div>
+              <div class="field-label equipment-label">Pilih unit alat <span class="required">*</span></div>
+              <div class="equipment-list" id="equipment-list"><div class="quiet-message">Memuat inventaris...</div></div>
+              <div class="estimate-row"><span>Estimasi biaya sewa</span><strong id="rental-estimate">Rp0</strong></div>
+              <button class="button button-dark button-wide" type="submit">Buat penyewaan <span>→</span></button>
+            </form>
+          </section>
+
+          <div class="right-forms">
+            <section class="panel form-panel"><div class="panel-heading"><div><div class="eyebrow">02 / TUTUP RENTAL</div><h2>Input pengembalian</h2></div><span class="step-mark step-coral">02</span></div>
+              <form id="return-form" class="form-stack">
+                <label class="field-label" for="return-rental">Penyewaan aktif <span class="required">*</span></label><select id="return-rental" required><option value="">Pilih penyewaan</option></select>
+                <div class="field-pair"><div><label class="field-label" for="actual-date">Tanggal kembali aktual</label><input id="actual-date" type="date" required></div><div class="fine-preview"><span>Perkiraan denda</span><strong id="fine-estimate">Rp0</strong></div></div>
+                <div class="inline-notice">Denda dihitung otomatis dari jumlah hari terlambat dan tarif setiap alat.</div>
+                <button class="button button-outline button-wide" type="submit">Catat pengembalian <span>→</span></button>
+              </form>
+            </section>
+            <section class="panel form-panel payment-panel"><div class="panel-heading"><div><div class="eyebrow">03 / TERIMA PEMBAYARAN</div><h2>Pembayaran denda</h2></div><span class="step-mark step-yellow">03</span></div>
+              <form id="payment-form" class="form-stack">
+                <label class="field-label" for="payment-return">Denda belum lunas <span class="required">*</span></label><select id="payment-return" required><option value="">Pilih tagihan</option></select>
+                <div class="field-pair"><div><label class="field-label" for="payment-date">Tanggal bayar</label><input id="payment-date" type="date" required></div><div><label class="field-label" for="payment-method">Metode</label><select id="payment-method" required><option value="Tunai">Tunai</option><option value="Transfer">Transfer</option><option value="QRIS">QRIS</option></select></div></div>
+                <label class="field-label" for="payment-amount">Jumlah dibayar (Rp) <span class="required">*</span></label><input id="payment-amount" type="number" min="1" step="1000" placeholder="0" required>
+                <button class="button button-yellow button-wide" type="submit">Simpan pembayaran <span>→</span></button>
+              </form>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-reports" aria-labelledby="reports-title">
+        <div class="page-heading"><div><div class="eyebrow">BUKU BESAR</div><h1 id="reports-title">Jurnal akuntansi</h1><p>Jejak pencatatan denda dan penerimaan pembayaran.</p></div><button class="button button-outline" id="download-csv" type="button"><span aria-hidden="true">↓</span> Unduh CSV</button></div>
+        <section class="panel journal-panel"><div class="journal-summary"><div><span class="summary-label">TOTAL DEBIT</span><strong id="journal-debit">Rp0</strong></div><div><span class="summary-label">TOTAL KREDIT</span><strong id="journal-credit">Rp0</strong></div><div class="journal-count"><span class="summary-label">BARIS JURNAL</span><strong id="journal-count">0</strong></div></div>
+          <div class="table-wrap"><table class="journal-table"><thead><tr><th>TANGGAL</th><th>AKUN</th><th>KETERANGAN</th><th class="amount-cell">DEBIT</th><th class="amount-cell">KREDIT</th></tr></thead><tbody id="journal-table"><tr><td colspan="5" class="empty-cell">Memuat jurnal...</td></tr></tbody></table></div>
+          <div class="journal-foot"><span><span class="live-dot"></span> Jurnal seimbang, diperbarui otomatis</span><span>Terbaru di atas</span></div>
+        </section>
+      </section>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </main>
+  </div>
+</body>
+</html>
