@@ -40,18 +40,24 @@ Sistem web untuk mengelola rental alat musik, pengembalian, denda keterlambatan,
 npm run check
 ```
 
-## GitHub
+## GitHub dan Supabase
 
-Repository lokal terhubung ke:
+Kode aplikasi disimpan di GitHub, sedangkan data transaksi disimpan di Supabase. GitHub Actions hanya memeriksa kode; kredensial Supabase tetap disimpan sebagai environment variable dan tidak dimasukkan ke repository.
+
+Repository:
 
 ```text
 https://github.com/ayugirsang/rental-musik.git
 ```
 
-Setelah repository kosong dibuat di GitHub, kirim commit dengan:
+Untuk mengirim perubahan:
 
 ```powershell
 git push -u origin main
 ```
 
-File `.env` dan `node_modules` tidak dikirim ke GitHub.
+File `.env` dan `node_modules` tidak dikirim ke GitHub. Jangan menaruh `service_role` key di repository atau di browser.
+
+## Keamanan Supabase
+
+`schema.sql` saat ini berisi policy demo untuk aplikasi akademik tanpa login. Sebelum deployment publik, ganti policy tersebut dengan RLS berbasis autentikasi Supabase dan batasi akses setiap pengguna sesuai kebutuhan.
