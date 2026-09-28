@@ -2,6 +2,9 @@ const state = { customers: [], equipment: [], rentals: [], unpaid: [], journals:
 const currency = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const dateFormatter = new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 const viewLabels = { dashboard: 'Ringkasan', transactions: 'Transaksi', reports: 'Jurnal akuntansi' };
+const supabaseClient = window.RITME_CONFIG && window.supabase?.createClient
+  ? window.supabase.createClient(window.RITME_CONFIG.supabaseUrl, window.RITME_CONFIG.supabasePublishableKey)
+  : null;
 
 function localDateValue(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -23,6 +26,7 @@ function escapeHtml(value) {
 }
 
 async function api(url, options = {}) {
+  if (supabaseClient) return supabaseApi(url, options);
   let response;
   try {
     response = await fetch(url, {
@@ -35,6 +39,71 @@ async function api(url, options = {}) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || `Permintaan gagal (${response.status}).`);
   return payload;
+}
+
+async function supabaseApi(url, options = {}) {
+  const body = options.body ? JSON.parse(options.body) : {};
+  let result;
+  if (url === '/api/dashboard') {
+    const [returns, rentals, equipment] = await Promise.all([
+      supabaseClient.from('pengembalian').select('total_denda'),
+      supabaseClient.from('penyewaan').select('id_sewa, tgl_rencana_kembali').eq('status_sewa', 'Berlangsung'),
+      supabaseClient.from('alat_musik').select('id_alat').eq('status', 'Disewa')
+    ]);
+    result = { data: {
+      totalPendapatanDenda: returns.data?.reduce((sum, row) => sum + Number(row.total_denda), 0),
+      penyewaanTerlambat: rentals.data?.filter(row => row.tgl_rencana_kembali < localDateValue()).length,
+      alatDisewa: equipment.data?.length
+    }, error: returns.error || rentals.error || equipment.error };
+  } else if (url === '/api/pelanggan' && options.method === 'POST') {
+    result = await supabaseClient.from('pelanggan').insert(body).select('id_pelanggan, nama, no_hp, alamat').single();
+  } else if (url === '/api/pelanggan') {
+    result = await supabaseClient.from('pelanggan').select('id_pelanggan, nama, no_hp, alamat').order('nama');
+  } else if (url === '/api/alat-musik') {
+    result = await supabaseClient.from('alat_musik').select('id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status').order('nama_alat');
+  } else if (url === '/api/penyewaan/aktif') {
+    result = await supabaseClient.from('penyewaan')
+      .select('id_sewa, tgl_sewa, tgl_rencana_kembali, total_biaya, pelanggan(nama), detail_penyewaan(jumlah, alat_musik(denda_per_hari))')
+      .eq('status_sewa', 'Berlangsung').order('tgl_rencana_kembali');
+  } else if (url === '/api/penyewaan' && options.method === 'POST') {
+    result = await supabaseClient.rpc('buat_penyewaan', {
+      p_id_pelanggan: body.id_pelanggan,
+      p_tgl_sewa: body.tgl_sewa,
+      p_tgl_rencana_kembali: body.tgl_rencana_kembali,
+      p_items: body.items
+    });
+    if (!result.error) result = { data: { id_sewa: result.data }, error: null };
+  } else if (url === '/api/pengembalian' && options.method === 'POST') {
+    result = await supabaseClient.from('pengembalian').insert(body)
+      .select('id_pengembalian, id_sewa, hari_terlambat, total_denda, status_pembayaran_denda').single();
+  } else if (url === '/api/pengembalian/belum-lunas') {
+    const returns = await supabaseClient.from('pengembalian')
+      .select('id_pengembalian, id_sewa, total_denda, status_pembayaran_denda')
+      .in('status_pembayaran_denda', ['Belum Lunas', 'Sebagian']).order('id_pengembalian', { ascending: false });
+    if (returns.error) result = returns;
+    else if (!returns.data.length) result = { data: [], error: null };
+    else {
+      const [{ data: payments, error: paymentError }, { data: rentals, error: rentalError }] = await Promise.all([
+        supabaseClient.from('pembayaran_denda').select('id_pengembalian, jumlah_bayar').in('id_pengembalian', returns.data.map(row => row.id_pengembalian)),
+        supabaseClient.from('penyewaan').select('id_sewa, pelanggan(nama)').in('id_sewa', returns.data.map(row => row.id_sewa))
+      ]);
+      const paidByReturn = new Map();
+      for (const payment of payments || []) paidByReturn.set(payment.id_pengembalian, (paidByReturn.get(payment.id_pengembalian) || 0) + Number(payment.jumlah_bayar));
+      const customerByRental = new Map((rentals || []).map(row => [row.id_sewa, row.pelanggan?.nama || 'Pelanggan']));
+      result = { data: returns.data.map(row => ({ ...row, nama_pelanggan: customerByRental.get(row.id_sewa), sisa_denda: Math.max(0, Number(row.total_denda) - (paidByReturn.get(row.id_pengembalian) || 0)) })).filter(row => row.sisa_denda > 0), error: paymentError || rentalError };
+    }
+  } else if (url === '/api/pembayaran-denda' && options.method === 'POST') {
+    result = await supabaseClient.from('pembayaran_denda').insert(body)
+      .select('id_pembayaran, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar').single();
+  } else if (url === '/api/jurnal') {
+    result = await supabaseClient.from('jurnal_akuntansi')
+      .select('id_jurnal, id_pengembalian, tgl_jurnal, kode_akun, nama_akun, debit, kredit, keterangan')
+      .order('tgl_jurnal', { ascending: false }).order('id_jurnal', { ascending: false }).limit(500);
+  } else {
+    throw new Error(`Endpoint tidak dikenali: ${url}`);
+  }
+  if (result.error) throw new Error(result.error.message || 'Permintaan Supabase gagal.');
+  return result.data;
 }
 
 function notify(message, isError = false) {

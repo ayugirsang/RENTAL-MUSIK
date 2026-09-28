@@ -60,16 +60,17 @@ File `.env` dan `node_modules` tidak dikirim ke GitHub. Jangan menaruh `service_
 
 ## Deploy menjadi link publik
 
-GitHub menyimpan kode, sedangkan server Node.js perlu dijalankan di hosting. Repository ini sudah menyediakan `render.yaml` untuk Render.
+Untuk tampilan dan link seperti `username.github.io/nama-repository`, repository ini sudah menyediakan workflow GitHub Pages. Mode Pages menjalankan frontend langsung di browser dan memakai Supabase sebagai backend data.
 
-1. Buka [Render](https://render.com) dan masuk menggunakan GitHub.
-2. Pilih **New > Blueprint**.
-3. Pilih repository `ayugirsang/RENTAL-MUSIK`.
-4. Isi environment variable `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY` dari Supabase.
-5. Klik **Apply** dan tunggu proses build selesai.
-6. Salin URL `onrender.com` yang diberikan Render.
+1. Buka repository GitHub, masuk ke **Settings > Secrets and variables > Actions**.
+2. Tambahkan repository secrets `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY`.
+3. Masuk ke **Settings > Pages**, pilih source **GitHub Actions**.
+4. Jalankan workflow **Deploy GitHub Pages** dari tab **Actions**.
+5. Salin URL Pages yang diberikan GitHub, biasanya `https://ayugirsang.github.io/RENTAL-MUSIK/`.
 
-Render akan menjalankan `npm ci`, kemudian `npm start`, dan otomatis melakukan deploy ulang setiap ada push ke branch `main`.
+Workflow akan membuat `config.js` saat build tanpa menyimpan `.env` di repository. Setiap push ke branch `main` akan memicu deploy ulang.
+
+Untuk menjalankan Express sebagai server API, gunakan `render.yaml` dan deployment Render. Mode ini cocok untuk penggunaan lokal atau server Node.js.
 
 ## Keamanan Supabase
 
