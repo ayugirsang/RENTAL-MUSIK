@@ -93,7 +93,7 @@
               <form id="payment-form" class="form-stack">
                 <label class="field-label" for="payment-return">Denda belum lunas <span class="required">*</span></label><select id="payment-return" required><option value="">Pilih tagihan</option></select>
                 <div class="field-pair"><div><label class="field-label" for="payment-date">Tanggal bayar</label><input id="payment-date" type="date" required></div><div><label class="field-label" for="payment-method">Metode</label><select id="payment-method" required><option value="Tunai">Tunai</option><option value="Transfer">Transfer</option><option value="QRIS">QRIS</option></select></div></div>
-                <label class="field-label" for="payment-amount">Jumlah dibayar (Rp) <span class="required">*</span></label><input id="payment-amount" type="number" min="1" step="1000" placeholder="0" required>
+                <label class="field-label" for="payment-amount">Jumlah dibayar (Rp) <span class="required">*</span></label><input id="payment-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="0" required><small id="payment-balance" class="field-hint" aria-live="polite">Pilih tagihan untuk melihat sisa denda.</small>
                 <button class="button button-yellow button-wide" type="submit">Simpan pembayaran <span>→</span></button>
               </form>
             </section>
