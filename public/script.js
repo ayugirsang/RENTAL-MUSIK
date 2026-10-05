@@ -237,11 +237,19 @@ function updateFineEstimate() {
 }
 
 function updatePaymentBalance() {
-  const option = document.querySelector('#payment-return').selectedOptions[0];
+  const select = document.querySelector('#payment-return');
+  const option = select.selectedOptions[0];
   const amount = document.querySelector('#payment-amount');
+  const balanceLabel = document.querySelector('#payment-balance');
   const balance = Number(option?.dataset.balance || 0);
   amount.max = balance || '';
   amount.placeholder = balance ? `Maks. ${currency.format(balance)}` : '0';
+  balanceLabel.textContent = balance
+    ? `Sisa denda: ${currency.format(balance)}. Nominal dapat diubah untuk membayar sebagian.`
+    : 'Pilih tagihan untuk melihat sisa denda.';
+  if (!select.value) amount.value = '';
+  else if (select.dataset.previousValue !== select.value) amount.value = balance || '';
+  select.dataset.previousValue = select.value;
 }
 
 function renderJournals() {
