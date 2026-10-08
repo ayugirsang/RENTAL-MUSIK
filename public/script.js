@@ -45,16 +45,16 @@ async function supabaseApi(url, options = {}) {
   const body = options.body ? JSON.parse(options.body) : {};
   let result;
   if (url === '/api/dashboard') {
-    const [returns, rentals, equipment] = await Promise.all([
-      supabaseClient.from('pengembalian').select('total_denda'),
+    const [payments, rentals, equipment] = await Promise.all([
+      getTotalFinePayments(),
       supabaseClient.from('penyewaan').select('id_sewa, tgl_rencana_kembali').eq('status_sewa', 'Berlangsung'),
       supabaseClient.from('alat_musik').select('id_alat').eq('status', 'Disewa')
     ]);
     result = { data: {
-      totalPendapatanDenda: returns.data?.reduce((sum, row) => sum + Number(row.total_denda), 0),
+      totalDendaDibayar: payments.total,
       penyewaanTerlambat: rentals.data?.filter(row => row.tgl_rencana_kembali < localDateValue()).length,
       alatDisewa: equipment.data?.length
-    }, error: returns.error || rentals.error || equipment.error };
+    }, error: payments.error || rentals.error || equipment.error };
   } else if (url === '/api/pelanggan' && options.method === 'POST') {
     result = await supabaseClient.from('pelanggan').insert(body).select('id_pelanggan, nama, no_hp, alamat').single();
   } else if (url === '/api/pelanggan') {
@@ -90,7 +90,15 @@ async function supabaseApi(url, options = {}) {
       const paidByReturn = new Map();
       for (const payment of payments || []) paidByReturn.set(payment.id_pengembalian, (paidByReturn.get(payment.id_pengembalian) || 0) + Number(payment.jumlah_bayar));
       const customerByRental = new Map((rentals || []).map(row => [row.id_sewa, row.pelanggan?.nama || 'Pelanggan']));
-      result = { data: returns.data.map(row => ({ ...row, nama_pelanggan: customerByRental.get(row.id_sewa), sisa_denda: Math.max(0, Number(row.total_denda) - (paidByReturn.get(row.id_pengembalian) || 0)) })).filter(row => row.sisa_denda > 0), error: paymentError || rentalError };
+      result = { data: returns.data.map(row => {
+        const total_terbayar = paidByReturn.get(row.id_pengembalian) || 0;
+        return {
+          ...row,
+          nama_pelanggan: customerByRental.get(row.id_sewa),
+          total_terbayar,
+          sisa_denda: Math.max(0, Number(row.total_denda) - total_terbayar)
+        };
+      }).filter(row => row.sisa_denda > 0), error: paymentError || rentalError };
     }
   } else if (url === '/api/pembayaran-denda' && options.method === 'POST') {
     result = await supabaseClient.from('pembayaran_denda').insert(body)
@@ -104,6 +112,20 @@ async function supabaseApi(url, options = {}) {
   }
   if (result.error) throw new Error(result.error.message || 'Permintaan Supabase gagal.');
   return result.data;
+}
+
+async function getTotalFinePayments() {
+  let total = 0;
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabaseClient.from('pembayaran_denda')
+      .select('id_pembayaran, jumlah_bayar')
+      .order('id_pembayaran')
+      .range(offset, offset + pageSize - 1);
+    if (error) return { total, error };
+    total += data.reduce((sum, payment) => sum + Number(payment.jumlah_bayar), 0);
+    if (data.length < pageSize) return { total, error: null };
+  }
 }
 
 function notify(message, isError = false) {
@@ -124,7 +146,7 @@ function setBusy(form, busy) {
 async function loadDashboard() {
   const [summary, rentals] = await Promise.all([api('/api/dashboard'), api('/api/penyewaan/aktif')]);
   state.rentals = rentals;
-  document.querySelector('#metric-income').textContent = currency.format(summary.totalPendapatanDenda);
+  document.querySelector('#metric-income').textContent = currency.format(summary.totalDendaDibayar);
   document.querySelector('#metric-late').textContent = summary.penyewaanTerlambat;
   document.querySelector('#metric-rented').textContent = summary.alatDisewa;
   const today = localDateValue();
@@ -158,7 +180,7 @@ async function loadUnpaid() {
   const select = document.querySelector('#payment-return');
   const previous = select.value;
   select.innerHTML = '<option value="">Pilih tagihan denda</option>' + state.unpaid.map(item =>
-    `<option value="${item.id_pengembalian}" data-balance="${item.sisa_denda}">Sewa #${item.id_sewa} · ${escapeHtml(item.nama_pelanggan)} · sisa ${currency.format(item.sisa_denda)}</option>`
+    `<option value="${item.id_pengembalian}" data-total="${item.total_denda}" data-paid="${item.total_terbayar}" data-balance="${item.sisa_denda}">Sewa #${item.id_sewa} · ${escapeHtml(item.nama_pelanggan)} · sisa ${currency.format(item.sisa_denda)}</option>`
   ).join('');
   if (previous) select.value = previous;
   updatePaymentBalance();
@@ -241,15 +263,36 @@ function updatePaymentBalance() {
   const option = select.selectedOptions[0];
   const amount = document.querySelector('#payment-amount');
   const balanceLabel = document.querySelector('#payment-balance');
+  const summary = document.querySelector('#payment-summary');
+  const quickActions = document.querySelectorAll('[data-payment-amount]');
   const balance = Number(option?.dataset.balance || 0);
+  const total = Number(option?.dataset.total || 0);
+  const paid = Number(option?.dataset.paid || 0);
   amount.max = balance || '';
   amount.placeholder = balance ? `Maks. ${currency.format(balance)}` : '0';
+  summary.hidden = !select.value;
+  summary.textContent = select.value
+    ? `Total denda ${currency.format(total)} · Terbayar ${currency.format(paid)} · Sisa ${currency.format(balance)}`
+    : '';
   balanceLabel.textContent = balance
-    ? `Sisa denda: ${currency.format(balance)}. Nominal dapat diubah untuk membayar sebagian.`
+    ? 'Masukkan nominal cicilan atau gunakan tombol cepat. Pembayaran bisa dilakukan beberapa kali sampai lunas.'
     : 'Pilih tagihan untuk melihat sisa denda.';
+  quickActions.forEach(button => {
+    button.disabled = !balance || (button.dataset.paymentAmount === 'half' && balance < 2);
+  });
   if (!select.value) amount.value = '';
   else if (select.dataset.previousValue !== select.value) amount.value = balance || '';
+  else if (Number(amount.value) > balance) amount.value = balance;
   select.dataset.previousValue = select.value;
+}
+
+function fillPaymentAmount(type) {
+  const select = document.querySelector('#payment-return');
+  const balance = Number(select.selectedOptions[0]?.dataset.balance || 0);
+  if (!balance) return;
+  document.querySelector('#payment-amount').value = type === 'half'
+    ? Math.floor(balance / 2)
+    : balance;
 }
 
 function renderJournals() {
@@ -331,6 +374,9 @@ function initialize() {
   });
   document.querySelector('#actual-date').addEventListener('change', updateFineEstimate);
   document.querySelector('#payment-return').addEventListener('change', updatePaymentBalance);
+  document.querySelectorAll('[data-payment-amount]').forEach(button => button.addEventListener('click', () => {
+    fillPaymentAmount(button.dataset.paymentAmount);
+  }));
   document.querySelector('#download-csv').addEventListener('click', exportJournals);
 
   document.querySelector('#toggle-customer-form').addEventListener('click', () => {
@@ -416,7 +462,9 @@ function initialize() {
     const form = event.currentTarget;
     const amount = Number(document.querySelector('#payment-amount').value);
     const selected = state.unpaid.find(item => String(item.id_pengembalian) === document.querySelector('#payment-return').value);
-    if (selected && amount > selected.sisa_denda) return notify('Jumlah pembayaran melebihi sisa denda.', true);
+    if (!selected || !Number.isFinite(amount) || amount <= 0) return notify('Pilih tagihan dan masukkan nominal cicilan yang valid.', true);
+    if (amount > selected.sisa_denda) return notify('Jumlah pembayaran melebihi sisa denda.', true);
+    const remaining = selected.sisa_denda - amount;
     setBusy(form, true);
     try {
       await api('/api/pembayaran-denda', { method: 'POST', body: JSON.stringify({
@@ -425,7 +473,9 @@ function initialize() {
         jumlah_bayar: amount,
         metode_bayar: document.querySelector('#payment-method').value
       }) });
-      notify('Pembayaran tersimpan dan jurnal kas diperbarui.');
+      notify(remaining > 0
+        ? `Cicilan ${currency.format(amount)} tersimpan. Sisa denda ${currency.format(remaining)}.`
+        : 'Denda lunas. Pembayaran dan jurnal kas berhasil diperbarui.');
       form.reset();
       document.querySelector('#payment-date').value = today;
       document.querySelector('#payment-method').value = 'Tunai';

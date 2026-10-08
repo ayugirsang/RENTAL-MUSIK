@@ -45,7 +45,7 @@
           <button class="button button-dark" type="button" data-go="transactions"><span aria-hidden="true">＋</span> Transaksi baru</button>
         </div>
         <div class="metric-grid">
-          <article class="metric metric-green"><div class="metric-top"><span>Pendapatan denda</span><span class="metric-icon">↗</span></div><strong id="metric-income">Rp0</strong><div class="metric-foot"><span class="metric-dot"></span>Akumulasi denda tercatat</div></article>
+          <article class="metric metric-green"><div class="metric-top"><span>Denda terkumpul</span><span class="metric-icon">↗</span></div><strong id="metric-income">Rp0</strong><div class="metric-foot"><span class="metric-dot"></span>Total pembayaran yang diterima</div></article>
           <article class="metric metric-paper"><div class="metric-top"><span>Penyewaan terlambat</span><span class="metric-icon icon-coral">⌁</span></div><strong id="metric-late">0</strong><div class="metric-foot">Belum dikembalikan melewati jadwal</div></article>
           <article class="metric metric-paper"><div class="metric-top"><span>Alat sedang disewa</span><span class="metric-icon icon-yellow">♫</span></div><strong id="metric-rented">0</strong><div class="metric-foot">Unit aktif di luar inventaris</div></article>
         </div>
@@ -93,7 +93,10 @@
               <form id="payment-form" class="form-stack">
                 <label class="field-label" for="payment-return">Denda belum lunas <span class="required">*</span></label><select id="payment-return" required><option value="">Pilih tagihan</option></select>
                 <div class="field-pair"><div><label class="field-label" for="payment-date">Tanggal bayar</label><input id="payment-date" type="date" required></div><div><label class="field-label" for="payment-method">Metode</label><select id="payment-method" required><option value="Tunai">Tunai</option><option value="Transfer">Transfer</option><option value="QRIS">QRIS</option></select></div></div>
-                <label class="field-label" for="payment-amount">Jumlah dibayar (Rp) <span class="required">*</span></label><input id="payment-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="0" required><small id="payment-balance" class="field-hint" aria-live="polite">Pilih tagihan untuk melihat sisa denda.</small>
+                <div id="payment-summary" class="payment-summary" aria-live="polite" hidden></div>
+                <label class="field-label" for="payment-amount">Jumlah dibayar (Rp) <span class="required">*</span></label><input id="payment-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="0" required>
+                <div class="payment-quick-actions"><button class="payment-quick-button" type="button" data-payment-amount="half" disabled>Isi setengah sisa</button><button class="payment-quick-button" type="button" data-payment-amount="balance" disabled>Isi sisa denda</button></div>
+                <small id="payment-balance" class="field-hint" aria-live="polite">Pilih tagihan untuk melihat sisa denda.</small>
                 <button class="button button-yellow button-wide" type="submit">Simpan pembayaran <span>→</span></button>
               </form>
             </section>
