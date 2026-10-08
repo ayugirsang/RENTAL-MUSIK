@@ -1,6 +1,8 @@
 const state = { customers: [], equipment: [], rentals: [], unpaid: [], journals: [], detail: null };
 const currency = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
-const dateFormatter = new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+const dateFormatter = new Intl.DateTimeFormat('id-ID', {
+  timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric'
+});
 const viewLabels = { dashboard: 'Ringkasan', transactions: 'Transaksi', details: 'Detail & laporan', reports: 'Jurnal akuntansi' };
 const supabaseClient = window.RITME_CONFIG && window.supabase?.createClient
   ? window.supabase.createClient(window.RITME_CONFIG.supabaseUrl, window.RITME_CONFIG.supabasePublishableKey)
@@ -18,7 +20,7 @@ function localDateValue(date = new Date()) {
 
 function formatDate(value) {
   if (!value) return '-';
-  return dateFormatter.format(new Date(`${value}T00:00:00`));
+  return dateFormatter.format(new Date(`${value}T00:00:00Z`));
 }
 
 function escapeHtml(value) {
