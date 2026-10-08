@@ -47,6 +47,20 @@ async function getTotalFinePayments() {
   }
 }
 
+async function getAllRows(table, columns, orderColumn) {
+  const rows = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from(table)
+      .select(columns)
+      .order(orderColumn)
+      .range(offset, offset + pageSize - 1);
+    if (error) return { data: rows, error };
+    rows.push(...data);
+    if (data.length < pageSize) return { data: rows, error: null };
+  }
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'ritme-api', time: new Date().toISOString() });
 });
@@ -169,6 +183,28 @@ app.post('/api/pembayaran-denda', async (req, res) => {
     .select('id_pembayaran, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar').single();
   if (error) return sendDatabaseError(res, error);
   res.status(201).json(data);
+});
+
+app.get('/api/detail', async (_req, res) => {
+  const [customers, equipment, rentals, rentalDetails, returns, payments] = await Promise.all([
+    getAllRows('pelanggan', 'id_pelanggan, nama, no_hp, alamat', 'id_pelanggan'),
+    getAllRows('alat_musik', 'id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status', 'id_alat'),
+    getAllRows('penyewaan', 'id_sewa, id_pelanggan, tgl_sewa, tgl_rencana_kembali, total_biaya, status_sewa', 'id_sewa'),
+    getAllRows('detail_penyewaan', 'id_detail, id_sewa, id_alat, jumlah, subtotal', 'id_detail'),
+    getAllRows('pengembalian', 'id_pengembalian, id_sewa, tgl_kembali_aktual, hari_terlambat, total_denda, status_pembayaran_denda', 'id_pengembalian'),
+    getAllRows('pembayaran_denda', 'id_pembayaran, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran')
+  ]);
+  const error = customers.error || equipment.error || rentals.error
+    || rentalDetails.error || returns.error || payments.error;
+  if (error) return sendDatabaseError(res, error, 500);
+  res.json({
+    customers: customers.data,
+    equipment: equipment.data,
+    rentals: rentals.data,
+    rentalDetails: rentalDetails.data,
+    returns: returns.data,
+    payments: payments.data
+  });
 });
 
 app.get('/api/jurnal', async (_req, res) => {

@@ -24,6 +24,7 @@
       <nav class="main-nav" aria-label="Navigasi utama">
         <button class="nav-link is-active" type="button" data-view="dashboard"><span class="nav-icon">◫</span>Ringkasan</button>
         <button class="nav-link" type="button" data-view="transactions"><span class="nav-icon">⇄</span>Transaksi</button>
+        <button class="nav-link" type="button" data-view="details"><span class="nav-icon">▦</span>Detail & laporan</button>
         <button class="nav-link" type="button" data-view="reports"><span class="nav-icon">▤</span>Jurnal akuntansi</button>
       </nav>
       <div class="sidebar-bottom">
@@ -102,6 +103,42 @@
             </section>
           </div>
         </div>
+      </section>
+
+      <section class="view" id="view-details" aria-labelledby="details-title">
+        <div class="page-heading"><div><div class="eyebrow">ANALISIS USAHA</div><h1 id="details-title">Detail & laporan</h1><p>Telusuri riwayat pembayaran, pelanggan, inventaris, dan performa usaha.</p></div><button class="button button-outline" id="download-detail-csv" type="button"><span aria-hidden="true">↓</span> Unduh laporan CSV</button></div>
+        <section class="panel detail-panel">
+          <div class="detail-section">
+            <div class="panel-heading"><div><div class="eyebrow">RIWAYAT CICILAN</div><h2>Rincian pembayaran denda</h2></div></div>
+            <label class="field-label" for="history-return">Pilih tagihan</label>
+            <select id="history-return"><option value="">Pilih tagihan denda</option></select>
+            <div id="payment-history" class="table-wrap"><div class="quiet-message">Pilih tagihan untuk melihat riwayat pembayarannya.</div></div>
+          </div>
+          <div class="detail-section">
+            <div class="panel-heading"><div><div class="eyebrow">PELANGGAN</div><h2>Riwayat penyewaan</h2></div></div>
+            <label class="field-label" for="history-customer">Pilih pelanggan</label>
+            <select id="history-customer"><option value="">Pilih pelanggan</option></select>
+            <div id="customer-history" class="table-wrap"><div class="quiet-message">Pilih pelanggan untuk melihat riwayatnya.</div></div>
+          </div>
+          <div class="detail-section">
+            <div class="panel-heading"><div><div class="eyebrow">INVENTARIS</div><h2>Performa per alat</h2></div></div>
+            <div id="equipment-report" class="table-wrap"><div class="quiet-message">Memuat ringkasan inventaris...</div></div>
+          </div>
+          <div class="detail-section">
+            <div class="panel-heading"><div><div class="eyebrow">LAPORAN KEUANGAN</div><h2>Rekap berdasarkan periode</h2></div></div>
+            <div class="report-filters">
+              <div><label class="field-label" for="report-start">Dari tanggal</label><input id="report-start" type="date"></div>
+              <div><label class="field-label" for="report-end">Sampai tanggal</label><input id="report-end" type="date"></div>
+              <button class="button button-outline" id="apply-report-filter" type="button">Terapkan filter</button>
+            </div>
+            <div class="report-metrics">
+              <article class="report-metric"><span>Denda tercatat</span><strong id="report-fines">Rp0</strong></article>
+              <article class="report-metric"><span>Pembayaran diterima</span><strong id="report-paid">Rp0</strong></article>
+              <article class="report-metric"><span>Sisa piutang saat ini</span><strong id="report-outstanding">Rp0</strong></article>
+            </div>
+            <div id="financial-report" class="table-wrap"></div>
+          </div>
+        </section>
       </section>
 
       <section class="view" id="view-reports" aria-labelledby="reports-title">

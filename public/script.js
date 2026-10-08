@@ -1,7 +1,7 @@
-const state = { customers: [], equipment: [], rentals: [], unpaid: [], journals: [] };
+const state = { customers: [], equipment: [], rentals: [], unpaid: [], journals: [], detail: null };
 const currency = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const dateFormatter = new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-const viewLabels = { dashboard: 'Ringkasan', transactions: 'Transaksi', reports: 'Jurnal akuntansi' };
+const viewLabels = { dashboard: 'Ringkasan', transactions: 'Transaksi', details: 'Detail & laporan', reports: 'Jurnal akuntansi' };
 const supabaseClient = window.RITME_CONFIG && window.supabase?.createClient
   ? window.supabase.createClient(window.RITME_CONFIG.supabaseUrl, window.RITME_CONFIG.supabasePublishableKey)
   : null;
@@ -103,6 +103,19 @@ async function supabaseApi(url, options = {}) {
   } else if (url === '/api/pembayaran-denda' && options.method === 'POST') {
     result = await supabaseClient.from('pembayaran_denda').insert(body)
       .select('id_pembayaran, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar').single();
+  } else if (url === '/api/detail') {
+    const [customers, equipment, rentals, rentalDetails, returns, payments] = await Promise.all([
+      getAllSupabaseRows('pelanggan', 'id_pelanggan, nama, no_hp, alamat', 'id_pelanggan'),
+      getAllSupabaseRows('alat_musik', 'id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status', 'id_alat'),
+      getAllSupabaseRows('penyewaan', 'id_sewa, id_pelanggan, tgl_sewa, tgl_rencana_kembali, total_biaya, status_sewa', 'id_sewa'),
+      getAllSupabaseRows('detail_penyewaan', 'id_detail, id_sewa, id_alat, jumlah, subtotal', 'id_detail'),
+      getAllSupabaseRows('pengembalian', 'id_pengembalian, id_sewa, tgl_kembali_aktual, hari_terlambat, total_denda, status_pembayaran_denda', 'id_pengembalian'),
+      getAllSupabaseRows('pembayaran_denda', 'id_pembayaran, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran')
+    ]);
+    result = {
+      data: { customers: customers.data, equipment: equipment.data, rentals: rentals.data, rentalDetails: rentalDetails.data, returns: returns.data, payments: payments.data },
+      error: customers.error || equipment.error || rentals.error || rentalDetails.error || returns.error || payments.error
+    };
   } else if (url === '/api/jurnal') {
     result = await supabaseClient.from('jurnal_akuntansi')
       .select('id_jurnal, id_pengembalian, tgl_jurnal, kode_akun, nama_akun, debit, kredit, keterangan')
@@ -125,6 +138,20 @@ async function getTotalFinePayments() {
     if (error) return { total, error };
     total += data.reduce((sum, payment) => sum + Number(payment.jumlah_bayar), 0);
     if (data.length < pageSize) return { total, error: null };
+  }
+}
+
+async function getAllSupabaseRows(table, columns, orderColumn) {
+  const rows = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabaseClient.from(table)
+      .select(columns)
+      .order(orderColumn)
+      .range(offset, offset + pageSize - 1);
+    if (error) return { data: rows, error };
+    rows.push(...data);
+    if (data.length < pageSize) return { data: rows, error: null };
   }
 }
 
@@ -189,6 +216,11 @@ async function loadUnpaid() {
 async function loadJournals() {
   state.journals = await api('/api/jurnal');
   renderJournals();
+}
+
+async function loadDetailData() {
+  state.detail = await api('/api/detail');
+  renderDetailData();
 }
 
 function rentalDays() {
@@ -295,6 +327,215 @@ function fillPaymentAmount(type) {
     : balance;
 }
 
+function detailLookups() {
+  const data = state.detail;
+  const customers = new Map(data.customers.map(row => [row.id_pelanggan, row]));
+  const equipment = new Map(data.equipment.map(row => [row.id_alat, row]));
+  const rentals = new Map(data.rentals.map(row => [row.id_sewa, row]));
+  const returns = new Map(data.returns.map(row => [row.id_sewa, row]));
+  const paymentsByReturn = new Map();
+  for (const payment of data.payments) {
+    const payments = paymentsByReturn.get(payment.id_pengembalian) || [];
+    payments.push(payment);
+    paymentsByReturn.set(payment.id_pengembalian, payments);
+  }
+  const rentalDetails = new Map();
+  for (const detail of data.rentalDetails) {
+    const details = rentalDetails.get(detail.id_sewa) || [];
+    details.push(detail);
+    rentalDetails.set(detail.id_sewa, details);
+  }
+  const paidByReturn = new Map();
+  for (const [id, payments] of paymentsByReturn) {
+    paidByReturn.set(id, payments.reduce((sum, payment) => sum + Number(payment.jumlah_bayar), 0));
+  }
+  return { customers, equipment, rentals, returns, paymentsByReturn, rentalDetails, paidByReturn };
+}
+
+function renderDetailData() {
+  const data = state.detail;
+  const selectReturn = document.querySelector('#history-return');
+  const previousReturn = selectReturn.value;
+  const selectCustomer = document.querySelector('#history-customer');
+  const previousCustomer = selectCustomer.value;
+  const { customers, rentals, returns } = detailLookups();
+  const returnRows = [...data.returns].sort((a, b) => b.id_pengembalian - a.id_pengembalian);
+  selectReturn.innerHTML = '<option value="">Pilih tagihan denda</option>' + returnRows.map(row => {
+    const rental = rentals.get(row.id_sewa);
+    const customer = customers.get(rental?.id_pelanggan);
+    return `<option value="${row.id_pengembalian}">Sewa #${row.id_sewa} · ${escapeHtml(customer?.nama || 'Pelanggan')} · ${formatDate(row.tgl_kembali_aktual)} · ${currency.format(Number(row.total_denda))}</option>`;
+  }).join('');
+  if (returnRows.some(row => String(row.id_pengembalian) === previousReturn)) selectReturn.value = previousReturn;
+  selectCustomer.innerHTML = '<option value="">Pilih pelanggan</option>' + data.customers.map(row =>
+    `<option value="${row.id_pelanggan}">${escapeHtml(row.nama)} · ${escapeHtml(row.no_hp)}</option>`
+  ).join('');
+  if (data.customers.some(row => String(row.id_pelanggan) === previousCustomer)) selectCustomer.value = previousCustomer;
+  renderPaymentHistory();
+  renderCustomerHistory();
+  renderEquipmentReport();
+  renderFinancialReport();
+}
+
+function renderPaymentHistory() {
+  const id = Number(document.querySelector('#history-return').value);
+  const container = document.querySelector('#payment-history');
+  const bill = state.detail.returns.find(row => row.id_pengembalian === id);
+  if (!bill) {
+    container.innerHTML = '<div class="quiet-message">Pilih tagihan untuk melihat riwayat pembayarannya.</div>';
+    return;
+  }
+  const { paymentsByReturn, paidByReturn } = detailLookups();
+  const payments = [...(paymentsByReturn.get(id) || [])].sort((a, b) =>
+    b.tgl_bayar.localeCompare(a.tgl_bayar) || b.id_pembayaran - a.id_pembayaran);
+  const paid = paidByReturn.get(id) || 0;
+  const balance = Math.max(0, Number(bill.total_denda) - paid);
+  const rows = payments.map(payment => `<tr>
+    <td>#${payment.id_pembayaran}</td><td>${formatDate(payment.tgl_bayar)}</td>
+    <td>${escapeHtml(payment.metode_bayar)}</td><td class="amount-cell">${currency.format(Number(payment.jumlah_bayar))}</td>
+  </tr>`).join('');
+  container.innerHTML = `<div class="detail-balance">Total ${currency.format(Number(bill.total_denda))} · Dibayar ${currency.format(paid)} · Sisa ${currency.format(balance)} · ${escapeHtml(bill.status_pembayaran_denda)}</div>
+    <table><thead><tr><th>PEMBAYARAN</th><th>TANGGAL</th><th>METODE</th><th class="amount-cell">NOMINAL</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4" class="empty-cell">Belum ada pembayaran untuk tagihan ini.</td></tr>'}</tbody></table>`;
+}
+
+function renderCustomerHistory() {
+  const id = Number(document.querySelector('#history-customer').value);
+  const container = document.querySelector('#customer-history');
+  if (!id) {
+    container.innerHTML = '<div class="quiet-message">Pilih pelanggan untuk melihat riwayatnya.</div>';
+    return;
+  }
+  const { rentals, returns, rentalDetails, equipment, paidByReturn } = detailLookups();
+  const rows = state.detail.rentals.filter(row => row.id_pelanggan === id)
+    .sort((a, b) => b.tgl_sewa.localeCompare(a.tgl_sewa) || b.id_sewa - a.id_sewa)
+    .map(rental => {
+      const rentalReturn = returns.get(rental.id_sewa);
+      const details = rentalDetails.get(rental.id_sewa) || [];
+      const names = details.map(detail => equipment.get(detail.id_alat)?.nama_alat || 'Alat').join(', ');
+      const paid = rentalReturn ? paidByReturn.get(rentalReturn.id_pengembalian) || 0 : 0;
+      const fine = Number(rentalReturn?.total_denda || 0);
+      const balance = Math.max(0, fine - paid);
+      const status = rentalReturn
+        ? fine === 0 ? 'Tidak ada denda' : balance === 0 ? 'Denda lunas' : paid > 0 ? 'Cicilan' : 'Denda belum lunas'
+        : rental.status_sewa;
+      return `<tr><td><strong>Sewa #${rental.id_sewa}</strong><small>${formatDate(rental.tgl_sewa)} – ${formatDate(rental.tgl_rencana_kembali)}</small></td>
+        <td>${escapeHtml(names || '—')}</td><td>${escapeHtml(status)}</td>
+        <td class="amount-cell">${currency.format(Number(rental.total_biaya))}</td>
+        <td class="amount-cell">${fine ? `${currency.format(paid)} / ${currency.format(fine)}` : '—'}</td></tr>`;
+    }).join('');
+  container.innerHTML = `<table><thead><tr><th>PENYEWAAN</th><th>ALAT</th><th>STATUS</th><th class="amount-cell">BIAYA SEWA</th><th class="amount-cell">DIBAYAR / DENDA</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5" class="empty-cell">Pelanggan ini belum memiliki riwayat penyewaan.</td></tr>'}</tbody></table>`;
+}
+
+function renderEquipmentReport() {
+  const { rentals, returns, rentalDetails, paymentsByReturn, equipment } = detailLookups();
+  const dataRows = state.detail.equipment.map(item => {
+    let rentalCount = 0;
+    let rentalIncome = 0;
+    let fines = 0;
+    let paid = 0;
+    for (const rental of state.detail.rentals) {
+      const details = rentalDetails.get(rental.id_sewa) || [];
+      const itemDetail = details.find(detail => detail.id_alat === item.id_alat);
+      if (!itemDetail) continue;
+      rentalCount += 1;
+      rentalIncome += Number(itemDetail.subtotal);
+      const rentalReturn = returns.get(rental.id_sewa);
+      if (rentalReturn) {
+        const weights = details.map(detail => {
+          const instrument = equipment.get(detail.id_alat);
+          return Number(instrument?.denda_per_hari || 0) * Number(detail.jumlah);
+        });
+        const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+        const index = details.indexOf(itemDetail);
+        const share = totalWeight ? weights[index] / totalWeight : 0;
+        fines += Number(rentalReturn.total_denda) * share;
+        paid += (paymentsByReturn.get(rentalReturn.id_pengembalian) || [])
+          .reduce((sum, payment) => sum + Number(payment.jumlah_bayar), 0) * share;
+      }
+    }
+    return `<tr><td><strong>${escapeHtml(item.nama_alat)}</strong><small>${currency.format(Number(item.harga_sewa_per_hari))} / hari</small></td>
+      <td><span class="status-pill ${item.status === 'Disewa' ? 'status-late' : 'status-active'}">${escapeHtml(item.status)}</span></td>
+      <td>${rentalCount}</td><td class="amount-cell">${currency.format(rentalIncome)}</td>
+      <td class="amount-cell">${currency.format(fines)}</td><td class="amount-cell">${currency.format(paid)}</td></tr>`;
+  }).join('');
+  document.querySelector('#equipment-report').innerHTML = `<table><thead><tr><th>ALAT</th><th>STATUS</th><th>JUMLAH SEWA</th><th class="amount-cell">PENDAPATAN SEWA</th><th class="amount-cell">DENDA TERCATAT</th><th class="amount-cell">DENDA DITERIMA</th></tr></thead>
+    <tbody>${dataRows || '<tr><td colspan="6" class="empty-cell">Belum ada data inventaris.</td></tr>'}</tbody></table>`;
+}
+
+function getFilteredReturns() {
+  const start = document.querySelector('#report-start').value;
+  const end = document.querySelector('#report-end').value;
+  if (start && end && start > end) throw new Error('Tanggal awal laporan tidak boleh melewati tanggal akhir.');
+  return state.detail.returns.filter(row =>
+    (!start || row.tgl_kembali_aktual >= start) && (!end || row.tgl_kembali_aktual <= end)
+  );
+}
+
+function renderFinancialReport() {
+  if (!state.detail) return;
+  let reportReturns;
+  try {
+    reportReturns = getFilteredReturns();
+  } catch (error) {
+    document.querySelector('#report-fines').textContent = currency.format(0);
+    document.querySelector('#report-paid').textContent = currency.format(0);
+    document.querySelector('#report-outstanding').textContent = currency.format(0);
+    document.querySelector('#financial-report').innerHTML = `<div class="inline-notice">${escapeHtml(error.message)}</div>`;
+    return;
+  }
+  const { customers, rentals, returns, paymentsByReturn, paidByReturn } = detailLookups();
+  const start = document.querySelector('#report-start').value;
+  const end = document.querySelector('#report-end').value;
+  const periodPayments = state.detail.payments.filter(payment =>
+    (!start || payment.tgl_bayar >= start) && (!end || payment.tgl_bayar <= end)
+  );
+  const outstanding = state.detail.returns.reduce((sum, row) =>
+    sum + Math.max(0, Number(row.total_denda) - (paidByReturn.get(row.id_pengembalian) || 0)), 0);
+  document.querySelector('#report-fines').textContent = currency.format(
+    reportReturns.reduce((sum, row) => sum + Number(row.total_denda), 0)
+  );
+  document.querySelector('#report-paid').textContent = currency.format(
+    periodPayments.reduce((sum, row) => sum + Number(row.jumlah_bayar), 0)
+  );
+  document.querySelector('#report-outstanding').textContent = currency.format(outstanding);
+  const rows = reportReturns.sort((a, b) => b.tgl_kembali_aktual.localeCompare(a.tgl_kembali_aktual))
+    .map(row => {
+      const rental = [...rentals.values()].find(item => item.id_sewa === row.id_sewa);
+      const customer = customers.get(rental?.id_pelanggan);
+      const paid = paidByReturn.get(row.id_pengembalian) || 0;
+      const balance = Math.max(0, Number(row.total_denda) - paid);
+      const status = Number(row.total_denda) === 0 ? 'Tidak ada denda' : balance === 0 ? 'Lunas' : paid > 0 ? 'Sebagian' : 'Belum lunas';
+      return `<tr><td>${formatDate(row.tgl_kembali_aktual)}</td><td><strong>${escapeHtml(customer?.nama || 'Pelanggan')}</strong><small>Sewa #${row.id_sewa}</small></td>
+        <td class="amount-cell">${currency.format(Number(row.total_denda))}</td><td class="amount-cell">${currency.format(paid)}</td>
+        <td class="amount-cell">${currency.format(balance)}</td><td><span class="status-pill detail-status">${escapeHtml(status)}</span></td></tr>`;
+    }).join('');
+  document.querySelector('#financial-report').innerHTML = `<table><thead><tr><th>TGL. KEMBALI</th><th>PELANGGAN / SEWA</th><th class="amount-cell">DENDA</th><th class="amount-cell">DIBAYAR</th><th class="amount-cell">SISA</th><th>STATUS</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="6" class="empty-cell">Tidak ada denda tercatat pada periode ini.</td></tr>'}</tbody></table>
+    <small class="field-hint">Denda tercatat difilter berdasarkan tanggal kembali; pembayaran diterima berdasarkan tanggal bayar. Sisa piutang menunjukkan seluruh tagihan yang belum lunas saat ini.</small>`;
+}
+
+function exportDetailReport() {
+  if (!state.detail) return notify('Data laporan belum dimuat.', true);
+  let rows;
+  try {
+    rows = getFilteredReturns();
+  } catch (error) {
+    return notify(error.message, true);
+  }
+  if (!rows.length) return notify('Tidak ada data laporan pada periode ini.', true);
+  const { customers, rentals, paidByReturn } = detailLookups();
+  const header = ['Tanggal kembali', 'ID sewa', 'Pelanggan', 'Total denda', 'Total dibayar', 'Sisa denda', 'Status'];
+  const csvRows = rows.map(row => {
+    const rental = rentals.get(row.id_sewa);
+    const customer = customers.get(rental?.id_pelanggan);
+    const paid = paidByReturn.get(row.id_pengembalian) || 0;
+    const balance = Math.max(0, Number(row.total_denda) - paid);
+    return [row.tgl_kembali_aktual, row.id_sewa, customer?.nama || 'Pelanggan', row.total_denda, paid, balance, balance ? paid ? 'Sebagian' : 'Belum lunas' : 'Lunas'];
+  });
+  downloadCsv(`laporan-denda-${document.querySelector('#report-start').value || 'awal'}-${document.querySelector('#report-end').value || 'akhir'}.csv`, [header, ...csvRows]);
+}
+
 function renderJournals() {
   const debit = state.journals.reduce((sum, row) => sum + Number(row.debit), 0);
   const credit = state.journals.reduce((sum, row) => sum + Number(row.kredit), 0);
@@ -312,7 +553,7 @@ function renderJournals() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadCustomers(), loadEquipment(), loadDashboard(), loadUnpaid(), loadJournals()]);
+  await Promise.all([loadCustomers(), loadEquipment(), loadDashboard(), loadUnpaid(), loadJournals(), loadDetailData()]);
 }
 
 async function refreshFromButton() {
@@ -340,10 +581,18 @@ function exportJournals() {
   if (!state.journals.length) return notify('Belum ada jurnal untuk diunduh.', true);
   const header = ['Tanggal', 'Kode akun', 'Nama akun', 'Keterangan', 'Debit', 'Kredit'];
   const rows = state.journals.map(row => [row.tgl_jurnal, row.kode_akun, row.nama_akun, row.keterangan, row.debit, row.kredit]);
-  const csv = [header, ...rows].map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  downloadCsv(`jurnal-denda-${localDateValue()}.csv`, [header, ...rows]);
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map(row => row.map(value => {
+    const text = String(value ?? '');
+    const safeText = /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text;
+    return `"${safeText.replace(/"/g, '""')}"`;
+  }).join(',')).join('\r\n');
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }));
-  link.download = `jurnal-denda-${localDateValue()}.csv`;
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -358,6 +607,8 @@ function initialize() {
   document.querySelector('#planned-date').value = today;
   document.querySelector('#actual-date').value = today;
   document.querySelector('#payment-date').value = today;
+  document.querySelector('#report-start').value = `${today.slice(0, 7)}-01`;
+  document.querySelector('#report-end').value = today;
   syncDateLimits();
 
   document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
@@ -374,6 +625,10 @@ function initialize() {
   });
   document.querySelector('#actual-date').addEventListener('change', updateFineEstimate);
   document.querySelector('#payment-return').addEventListener('change', updatePaymentBalance);
+  document.querySelector('#history-return').addEventListener('change', renderPaymentHistory);
+  document.querySelector('#history-customer').addEventListener('change', renderCustomerHistory);
+  document.querySelector('#apply-report-filter').addEventListener('click', renderFinancialReport);
+  document.querySelector('#download-detail-csv').addEventListener('click', exportDetailReport);
   document.querySelectorAll('[data-payment-amount]').forEach(button => button.addEventListener('click', () => {
     fillPaymentAmount(button.dataset.paymentAmount);
   }));
@@ -397,7 +652,7 @@ function initialize() {
           alamat: document.querySelector('#customer-address').value
         })
       });
-      await loadCustomers();
+      await Promise.all([loadCustomers(), loadDetailData()]);
       document.querySelector('#rental-customer').value = customer.id_pelanggan;
       document.querySelector('#customer-create').hidden = true;
       document.querySelector('#customer-create').querySelectorAll('input').forEach(input => { input.value = ''; });
@@ -427,7 +682,7 @@ function initialize() {
       document.querySelector('#rental-date').value = today;
       document.querySelector('#planned-date').value = today;
       syncDateLimits();
-      await Promise.all([loadEquipment(), loadDashboard()]);
+      await Promise.all([loadEquipment(), loadDashboard(), loadDetailData()]);
     } catch (error) {
       notify(error.message, true);
     } finally {
@@ -449,7 +704,7 @@ function initialize() {
         : 'Pengembalian dicatat tanpa denda.');
       form.reset();
       document.querySelector('#actual-date').value = today;
-      await Promise.all([loadEquipment(), loadDashboard(), loadUnpaid(), loadJournals()]);
+      await Promise.all([loadEquipment(), loadDashboard(), loadUnpaid(), loadJournals(), loadDetailData()]);
     } catch (error) {
       notify(error.message, true);
     } finally {
@@ -479,7 +734,7 @@ function initialize() {
       form.reset();
       document.querySelector('#payment-date').value = today;
       document.querySelector('#payment-method').value = 'Tunai';
-      await Promise.all([loadUnpaid(), loadJournals(), loadDashboard()]);
+      await Promise.all([loadUnpaid(), loadJournals(), loadDashboard(), loadDetailData()]);
     } catch (error) {
       notify(error.message, true);
     } finally {
