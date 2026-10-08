@@ -69,7 +69,7 @@ app.get('/api/dashboard', async (_req, res) => {
   const [paymentsResult, rentalsResult, equipmentResult] = await Promise.all([
     getTotalFinePayments(),
     supabase.from('penyewaan').select('id_sewa, tgl_rencana_kembali').eq('status_sewa', 'Berlangsung'),
-    supabase.from('alat_musik').select('id_alat').eq('status', 'Disewa')
+    supabase.from('alat_musik').select('id_alat, status')
   ]);
   const error = paymentsResult.error || rentalsResult.error || equipmentResult.error;
   if (error) return sendDatabaseError(res, error, 500);
@@ -77,10 +77,19 @@ app.get('/api/dashboard', async (_req, res) => {
   const today = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
   }).format(new Date());
+  const todayUtc = Date.parse(`${today}T00:00:00Z`);
+  const daysUntil = date => Math.round((Date.parse(`${date}T00:00:00Z`) - todayUtc) / 86400000);
+  const dueSoon = rentalsResult.data.filter(row => {
+    const days = daysUntil(row.tgl_rencana_kembali);
+    return days >= 0 && days <= 3;
+  }).length;
   res.json({
     totalDendaDibayar: paymentsResult.total,
+    penyewaanBerlangsung: rentalsResult.data.length,
+    penyewaanJatuhTempo: dueSoon,
     penyewaanTerlambat: rentalsResult.data.filter(row => row.tgl_rencana_kembali < today).length,
-    alatDisewa: equipmentResult.data.length
+    alatTersedia: equipmentResult.data.filter(row => row.status === 'Tersedia').length,
+    alatDisewa: equipmentResult.data.filter(row => row.status === 'Disewa').length
   });
 });
 
