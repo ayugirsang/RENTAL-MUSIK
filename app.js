@@ -116,6 +116,24 @@ app.get('/api/alat-musik', async (_req, res) => {
   res.json(data);
 });
 
+app.post('/api/alat-musik', async (req, res) => {
+  const body = req.body || {};
+  const nama = typeof body.nama_alat === 'string' ? body.nama_alat.trim() : '';
+  const rawHarga = body.harga_sewa_per_hari;
+  const rawDenda = body.denda_per_hari;
+  const harga = typeof rawHarga === 'number' || (typeof rawHarga === 'string' && rawHarga.trim()) ? Number(rawHarga) : NaN;
+  const denda = typeof rawDenda === 'number' || (typeof rawDenda === 'string' && rawDenda.trim()) ? Number(rawDenda) : NaN;
+  if (!nama || nama.length > 100) return res.status(400).json({ error: 'Nama alat wajib diisi (maksimal 100 karakter).' });
+  if (!Number.isFinite(harga) || harga < 0 || !Number.isFinite(denda) || denda < 0) {
+    return res.status(400).json({ error: 'Harga sewa dan denda harus berupa angka nol atau lebih.' });
+  }
+  const { data, error } = await supabase.from('alat_musik')
+    .insert({ nama_alat: nama, harga_sewa_per_hari: harga, denda_per_hari: denda })
+    .select('id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status').single();
+  if (error) return sendDatabaseError(res, error);
+  res.status(201).json(data);
+});
+
 app.get('/api/penyewaan/aktif', async (_req, res) => {
   const { data, error } = await supabase.from('penyewaan')
     .select('id_sewa, tgl_sewa, tgl_rencana_kembali, total_biaya, pelanggan(nama), detail_penyewaan(jumlah, alat_musik(denda_per_hari))')

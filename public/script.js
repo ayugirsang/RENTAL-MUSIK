@@ -79,6 +79,9 @@ async function supabaseApi(url, options = {}) {
     result = await supabaseClient.from('pelanggan').insert(body).select('id_pelanggan, nama, no_hp, alamat').single();
   } else if (url === '/api/pelanggan') {
     result = await supabaseClient.from('pelanggan').select('id_pelanggan, nama, no_hp, alamat').order('nama');
+  } else if (url === '/api/alat-musik' && options.method === 'POST') {
+    result = await supabaseClient.from('alat_musik')
+      .insert(body).select('id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status').single();
   } else if (url === '/api/alat-musik') {
     result = await supabaseClient.from('alat_musik').select('id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status').order('nama_alat');
   } else if (url === '/api/penyewaan/aktif') {
@@ -307,18 +310,83 @@ function renderEquipment() {
   const list = document.querySelector('#equipment-list');
   const available = state.equipment.filter(item => item.status === 'Tersedia');
   if (!available.length) {
-    list.innerHTML = '<div class="quiet-message">Semua unit sedang disewa.</div>';
+    list.innerHTML = '<div class="quiet-message">Semua alat sedang disewa. Tambahkan unit baru atau tunggu pengembalian.</div>';
     updateRentalEstimate();
     return;
   }
   list.innerHTML = available.map(item => `<label class="equipment-option">
     <input type="checkbox" name="equipment" value="${item.id_alat}" data-rate="${item.harga_sewa_per_hari}">
     <span class="check-box" aria-hidden="true">✓</span>
+    ${instrumentArtwork(item.nama_alat)}
     <span class="equipment-name">${escapeHtml(item.nama_alat)}<small>Denda ${currency.format(Number(item.denda_per_hari))} / hari</small></span>
     <strong>${currency.format(Number(item.harga_sewa_per_hari))}<small>/ hari</small></strong>
   </label>`).join('');
   list.querySelectorAll('input').forEach(input => input.addEventListener('change', updateRentalEstimate));
   updateRentalEstimate();
+}
+
+function instrumentArtwork(name) {
+  const normalized = String(name).toLowerCase();
+  if (/keyboard|piano|organ/.test(normalized)) {
+    return '<span class="instrument-art art-keys" aria-hidden="true"><svg viewBox="0 0 64 64"><rect x="8" y="18" width="48" height="29" rx="5"/><path d="M14 22v20m8-20v20m8-20v20m8-20v20m8-20v20m8-20v20M14 31h36"/><path class="art-detail" d="M18 22v10m8-10v10m8-10v10m8-10v10m8-10v10"/></svg></span>';
+  }
+  if (/drum|cajon|perkusi|conga|bongo/.test(normalized)) {
+    return '<span class="instrument-art art-drum" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M13 24c0-7 8-12 19-12s19 5 19 12v20c0 6-8 10-19 10s-19-4-19-10z"/><path d="M13 24c0 6 8 10 19 10s19-4 19-10M19 36v10m26-10v10M24 15l-7-7m23 7 7-7"/></svg></span>';
+  }
+  if (/mikrofon|microphone/.test(normalized)) {
+    return '<span class="instrument-art art-mic" aria-hidden="true"><svg viewBox="0 0 64 64"><rect x="24" y="10" width="16" height="30" rx="8"/><path d="M17 29v4a15 15 0 0 0 30 0v-4M32 48v8m-9 0h18M26 18h12m-12 7h12"/></svg></span>';
+  }
+  if (/sax|saksofon|terompet|trompet|trumpet|flute|seruling|suling|klarinet|clarinet/.test(normalized)) {
+    return '<span class="instrument-art art-wind" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M20 12c5 5 6 10 3 15L15 39a9 9 0 0 0 13 12l13-13c5-5 9-6 15-5"/><path d="M43 16v21m7-18v17m-31 5 8 8m2-15 7 7m-2-15 7 6"/><circle cx="52" cy="33" r="5"/></svg></span>';
+  }
+  if (/biola|violin|cello|selo/.test(normalized)) {
+    return '<span class="instrument-art art-strings" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M29 10h6v13c8 0 11 7 7 13 5 7 1 15-7 15v4h-6v-4c-8 0-12-8-7-15-4-6-1-13 7-13z"/><path d="M32 10v45M23 29h18M20 8l25 48"/></svg></span>';
+  }
+  if (/ampli|speaker|pengeras suara/.test(normalized)) {
+    return '<span class="instrument-art art-default" aria-hidden="true"><svg viewBox="0 0 64 64"><rect x="15" y="9" width="34" height="46" rx="5"/><circle cx="32" cy="31" r="11"/><circle cx="32" cy="31" r="4"/><circle cx="23" cy="47" r="1"/><circle cx="29" cy="47" r="1"/></svg></span>';
+  }
+  if (/gitar|guitar|bass|ukulele|uke/.test(normalized)) {
+    return '<span class="instrument-art art-strings" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M37 12 49 7l2 3-9 9 4 5c5 5 4 12-1 16-3 3-7 4-11 2l-5 8c-5 6-13 4-17-1s-3-12 3-16l8-5c-2-4-1-9 2-12 4-4 10-5 15-1z"/><path d="M37 12 17 51M24 26l15 14"/><circle cx="36" cy="32" r="4"/><path class="art-detail" d="M42 9 28 28m4 4 15 13"/></svg></span>';
+  }
+  return '<span class="instrument-art art-default" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M14 40c0-4 3-7 7-7h5l5-19h5l5 19h3c4 0 7 3 7 7s-3 7-7 7H21c-4 0-7-3-7-7z"/><path d="M32 14h6m-9 13h12m-8-6h4"/></svg></span>';
+}
+
+async function addEquipment() {
+  const nameInput = document.querySelector('#equipment-name');
+  const rateInput = document.querySelector('#equipment-rate');
+  const fineInput = document.querySelector('#equipment-fine');
+  const nama_alat = nameInput.value.trim();
+  const harga_sewa_per_hari = Number(rateInput.value);
+  const denda_per_hari = Number(fineInput.value);
+  if (!nama_alat || nama_alat.length > 100) return notify('Nama alat wajib diisi (maksimal 100 karakter).', true);
+  if (!rateInput.value.trim() || !fineInput.value.trim() ||
+      !Number.isFinite(harga_sewa_per_hari) || harga_sewa_per_hari < 0 ||
+      !Number.isFinite(denda_per_hari) || denda_per_hari < 0) {
+    return notify('Isi harga sewa dan denda dengan angka nol atau lebih.', true);
+  }
+  const button = document.querySelector('#save-equipment');
+  button.disabled = true;
+  try {
+    const equipment = await api('/api/alat-musik', {
+      method: 'POST',
+      body: JSON.stringify({ nama_alat, harga_sewa_per_hari, denda_per_hari })
+    });
+    nameInput.value = '';
+    rateInput.value = '';
+    fineInput.value = '';
+    document.querySelector('#equipment-create').hidden = true;
+    document.querySelector('#toggle-equipment-form').setAttribute('aria-expanded', 'false');
+    try {
+      await Promise.all([loadEquipment(), loadDashboard(), loadDetailData()]);
+    } catch (error) {
+      return notify(`${equipment.nama_alat} tersimpan, tetapi data tampilan gagal diperbarui: ${error.message}`, true);
+    }
+    notify(`${equipment.nama_alat} berhasil ditambahkan ke inventaris.`);
+  } catch (error) {
+    notify(`Gagal menambahkan alat: ${error.message}`, true);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function updateRentalEstimate() {
@@ -706,6 +774,14 @@ function initialize() {
     form.hidden = !form.hidden;
     if (!form.hidden) document.querySelector('#customer-name').focus();
   });
+
+  document.querySelector('#toggle-equipment-form').addEventListener('click', event => {
+    const form = document.querySelector('#equipment-create');
+    form.hidden = !form.hidden;
+    event.currentTarget.setAttribute('aria-expanded', String(!form.hidden));
+    if (!form.hidden) document.querySelector('#equipment-name').focus();
+  });
+  document.querySelector('#save-equipment').addEventListener('click', addEquipment);
 
   document.querySelector('#save-customer').addEventListener('click', async event => {
     const button = event.currentTarget;

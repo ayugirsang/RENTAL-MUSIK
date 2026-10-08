@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=workspace-polish-1">
-  <script src="script.js?v=seller-dashboard-1" defer></script>
+  <link rel="stylesheet" href="style.css?v=instrument-catalog-3">
+  <script src="script.js?v=instrument-catalog-3" defer></script>
    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
    <script src="config.js"></script>
 </head>
@@ -82,7 +82,12 @@
                 <button class="button button-outline button-small" id="save-customer" type="button">Simpan pelanggan</button>
               </div>
               <div class="field-pair"><div><label class="field-label" for="rental-date">Tanggal sewa <span class="required">*</span></label><input id="rental-date" type="date" required></div><div><label class="field-label" for="planned-date">Rencana kembali <span class="required">*</span></label><input id="planned-date" type="date" required></div></div>
-              <div class="field-label equipment-label">Pilih unit alat <span class="required">*</span></div>
+              <div class="equipment-heading"><div class="field-label equipment-label">Pilih unit alat <span class="required">*</span></div><button class="text-button" id="toggle-equipment-form" type="button" aria-expanded="false">＋ Tambah alat</button></div>
+              <div class="equipment-create" id="equipment-create" hidden>
+                <div class="field-pair"><div><label class="field-label" for="equipment-name">Nama alat musik <span class="required">*</span></label><input id="equipment-name" type="text" maxlength="100" placeholder="Contoh: Biola"></div><div><label class="field-label" for="equipment-rate">Tarif sewa / hari (Rp) <span class="required">*</span></label><input id="equipment-rate" type="number" min="0" step="1000" inputmode="numeric" placeholder="Contoh: 50000"></div></div>
+                <div class="field-pair"><div><label class="field-label" for="equipment-fine">Denda / hari (Rp) <span class="required">*</span></label><input id="equipment-fine" type="number" min="0" step="1000" inputmode="numeric" placeholder="Contoh: 10000"></div><div class="equipment-save-wrap"><button class="button button-outline button-small" id="save-equipment" type="button">Simpan ke inventaris</button></div></div>
+                <small class="field-hint">Alat baru langsung tersedia untuk penyewaan. Isi nama, tarif, dan denda per hari.</small>
+              </div>
               <div class="equipment-list" id="equipment-list"><div class="quiet-message">Memuat inventaris...</div></div>
               <div class="estimate-row"><span>Estimasi biaya sewa</span><strong id="rental-estimate">Rp0</strong></div>
               <button class="button button-dark button-wide" type="submit">Buat penyewaan <span>→</span></button>
