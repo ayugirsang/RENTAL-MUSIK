@@ -125,6 +125,17 @@ td small { display: block; margin-top: 4px; color: #969b91; font: 10px var(--mon
 .payment-quick-button { min-height: 32px; padding: 0 8px; border: 1px solid #cfdaea; border-radius: 3px; background: #fff; color: #2457bd; cursor: pointer; font-size: 10px; font-weight: 600; }
 .payment-quick-button:hover:not(:disabled) { background: #edf3ff; }
 .payment-quick-button:disabled { cursor: not-allowed; opacity: .55; }
+.detail-panel { display: grid; gap: 0; overflow: hidden; }
+.detail-section { display: grid; gap: 12px; padding: 20px 22px; }
+.detail-section + .detail-section { border-top: 1px solid var(--line); }
+.detail-section > .table-wrap table { min-width: 620px; }
+.detail-section > .table-wrap th, .detail-section > .table-wrap td { padding-right: 12px; padding-left: 12px; }
+.report-filters { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto; gap: 10px; align-items: end; }
+.report-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.report-metric { display: grid; min-width: 0; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 4px; background: #fbfcfe; }
+.report-metric span { color: var(--muted); font-size: 11px; }
+.report-metric strong { overflow: hidden; font: 700 17px var(--serif); text-overflow: ellipsis; white-space: nowrap; }
+.detail-status { white-space: nowrap; }
 .required { color: #cb6652; }
 input, select { width: 100%; min-width: 0; height: 39px; padding: 0 10px; border: 1px solid #dfe2d9; border-radius: 3px; outline: none; background: #fff; color: #30362e; font-size: 12px; }
 input:focus, select:focus { border-color: #87975c; box-shadow: 0 0 0 2px #e8efcf; }
@@ -198,6 +209,7 @@ input[type="date"] { color: #41473e; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .note-panel { min-height: 210px; }
   .transaction-grid { grid-template-columns: 1fr; }
+  .detail-section { padding: 17px 14px; }
 }
 @media (max-width: 560px) {
   .sidebar { width: 57px; padding-right: 6px; padding-left: 6px; }
@@ -213,6 +225,9 @@ input[type="date"] { color: #41473e; }
   .page-heading p { max-width: 250px; font-size: 11px; line-height: 1.5; }
   .page-heading > .button { min-height: 35px; gap: 5px; padding: 0 9px; font-size: 10px; }
   .metric-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .report-filters { grid-template-columns: 1fr 1fr; }
+  .report-filters > button { grid-column: 1 / -1; }
+  .report-metrics { grid-template-columns: 1fr; }
   .metric { min-height: 126px; padding: 13px 12px; }
   .metric:first-child { grid-column: 1 / -1; }
   .metric-top { font-size: 10px; }
