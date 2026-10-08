@@ -1,6 +1,6 @@
 # Ritme - Rental & Accounting
 
-Sistem web untuk mengelola rental alat musik, pengembalian, denda keterlambatan, pembayaran, dan jurnal akuntansi. Menu **Detail & laporan** menyediakan riwayat cicilan per tagihan, riwayat penyewaan pelanggan, performa tiap alat, serta rekap denda dan piutang yang dapat difilter tanggal dan diunduh sebagai CSV.
+Sistem web untuk mengelola rental alat musik, pengembalian, denda keterlambatan, pembayaran, dan jurnal akuntansi. Dashboard penjual merangkum rental aktif, jadwal jatuh tempo tiga hari ke depan, keterlambatan, stok alat tersedia, dan pembayaran denda yang diterima. Jadwal dapat difilter berdasarkan status, sementara daftar tindak lanjut menyorot rental terlambat, pengembalian dekat, dan tagihan denda terbuka. Menu **Detail & laporan** menyediakan riwayat cicilan per tagihan, riwayat penyewaan pelanggan, performa tiap alat, serta rekap denda dan piutang yang dapat difilter tanggal dan diunduh sebagai CSV.
 
 ## Kebutuhan
 

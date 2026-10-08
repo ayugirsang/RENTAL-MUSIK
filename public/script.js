@@ -1,4 +1,4 @@
-const state = { customers: [], equipment: [], rentals: [], unpaid: [], journals: [], detail: null };
+const state = { customers: [], equipment: [], rentals: [], unpaid: [], journals: [], detail: null, rentalFilter: 'all' };
 const currency = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const dateFormatter = new Intl.DateTimeFormat('id-ID', {
   timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric'
@@ -27,6 +27,19 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 }
 
+function daysUntil(dateValue, today = localDateValue()) {
+  return Math.round((Date.parse(`${dateValue}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
+}
+
+function countRentalDates(rentals, today = localDateValue()) {
+  return rentals.reduce((counts, rental) => {
+    const days = daysUntil(rental.tgl_rencana_kembali, today);
+    if (days < 0) counts.late += 1;
+    else if (days <= 3) counts.dueSoon += 1;
+    return counts;
+  }, { dueSoon: 0, late: 0 });
+}
+
 async function api(url, options = {}) {
   if (supabaseClient) return supabaseApi(url, options);
   let response;
@@ -50,12 +63,17 @@ async function supabaseApi(url, options = {}) {
     const [payments, rentals, equipment] = await Promise.all([
       getTotalFinePayments(),
       supabaseClient.from('penyewaan').select('id_sewa, tgl_rencana_kembali').eq('status_sewa', 'Berlangsung'),
-      supabaseClient.from('alat_musik').select('id_alat').eq('status', 'Disewa')
+      supabaseClient.from('alat_musik').select('id_alat, status')
     ]);
+    const today = localDateValue();
+    const rentalCounts = countRentalDates(rentals.data || [], today);
     result = { data: {
       totalDendaDibayar: payments.total,
-      penyewaanTerlambat: rentals.data?.filter(row => row.tgl_rencana_kembali < localDateValue()).length,
-      alatDisewa: equipment.data?.length
+      penyewaanBerlangsung: rentals.data?.length,
+      penyewaanJatuhTempo: rentalCounts.dueSoon,
+      penyewaanTerlambat: rentalCounts.late,
+      alatTersedia: equipment.data?.filter(row => row.status === 'Tersedia').length,
+      alatDisewa: equipment.data?.filter(row => row.status === 'Disewa').length
     }, error: payments.error || rentals.error || equipment.error };
   } else if (url === '/api/pelanggan' && options.method === 'POST') {
     result = await supabaseClient.from('pelanggan').insert(body).select('id_pelanggan, nama, no_hp, alamat').single();
@@ -175,18 +193,55 @@ function setBusy(form, busy) {
 async function loadDashboard() {
   const [summary, rentals] = await Promise.all([api('/api/dashboard'), api('/api/penyewaan/aktif')]);
   state.rentals = rentals;
+  document.querySelector('#metric-active').textContent = summary.penyewaanBerlangsung;
+  document.querySelector('#metric-due-soon').textContent = summary.penyewaanJatuhTempo;
   document.querySelector('#metric-income').textContent = currency.format(summary.totalDendaDibayar);
   document.querySelector('#metric-late').textContent = summary.penyewaanTerlambat;
-  document.querySelector('#metric-rented').textContent = summary.alatDisewa;
-  const today = localDateValue();
-  const rows = rentals.slice(0, 7).map(rental => {
-    const late = rental.tgl_rencana_kembali < today;
-    return `<tr><td><strong>${escapeHtml(rental.pelanggan?.nama || 'Pelanggan')}</strong><small>Sewa #${rental.id_sewa}</small></td><td>${formatDate(rental.tgl_rencana_kembali)}</td><td>${currency.format(Number(rental.total_biaya))}</td><td><span class="status-pill ${late ? 'status-late' : 'status-active'}"><i></i>${late ? 'Terlambat' : 'Berlangsung'}</span></td></tr>`;
-  }).join('');
-  document.querySelector('#due-table').innerHTML = rows || '<tr><td colspan="4" class="empty-cell">Belum ada penyewaan aktif.</td></tr>';
+  document.querySelector('#metric-available').textContent = summary.alatTersedia;
+  renderDueTable();
+  renderSellerFollowup();
   renderRentalOptions();
   syncDateLimits();
   updateFineEstimate();
+}
+
+function renderDueTable() {
+  const today = localDateValue();
+  const datedRentals = state.rentals.map(rental => ({ rental, days: daysUntil(rental.tgl_rencana_kembali, today) }));
+  document.querySelector('#count-rentals').textContent = datedRentals.length;
+  document.querySelector('#count-due-soon').textContent = datedRentals.filter(({ days }) => days >= 0 && days <= 3).length;
+  document.querySelector('#count-late').textContent = datedRentals.filter(({ days }) => days < 0).length;
+  const filtered = datedRentals.filter(({ days }) => {
+    if (state.rentalFilter === 'soon') return days >= 0 && days <= 3;
+    if (state.rentalFilter === 'late') return days < 0;
+    return true;
+  });
+  const rows = filtered.slice(0, 8).map(({ rental, days }) => {
+    const status = days < 0
+      ? { className: 'status-late', label: `Terlambat ${Math.abs(days)} hari` }
+      : days === 0
+        ? { className: 'status-due', label: 'Jatuh tempo hari ini' }
+        : days <= 3
+          ? { className: 'status-due', label: `Dalam ${days} hari` }
+          : { className: 'status-active', label: 'Berlangsung' };
+    return `<tr><td><strong>${escapeHtml(rental.pelanggan?.nama || 'Pelanggan')}</strong><small>Sewa #${rental.id_sewa}</small></td><td>${formatDate(rental.tgl_rencana_kembali)}</td><td>${currency.format(Number(rental.total_biaya))}</td><td><span class="status-pill ${status.className}"><i></i>${status.label}</span></td></tr>`;
+  }).join('');
+  const emptyMessage = state.rentalFilter === 'all' ? 'Belum ada penyewaan aktif.' : 'Tidak ada pengembalian pada filter ini.';
+  document.querySelector('#due-table').innerHTML = rows || `<tr><td colspan="4" class="empty-cell">${emptyMessage}</td></tr>`;
+  document.querySelector('#due-caption').textContent = filtered.length > 8
+    ? `Menampilkan 8 dari ${filtered.length} penyewaan. Kelola daftar lengkap melalui menu Transaksi.`
+    : 'Pengingat jatuh tempo mencakup hari ini hingga 3 hari ke depan.';
+}
+
+function renderSellerFollowup() {
+  const counts = countRentalDates(state.rentals);
+  const outstanding = state.unpaid.reduce((sum, item) => sum + Number(item.sisa_denda), 0);
+  const reminders = [
+    `<div class="followup-item"><span class="followup-indicator ${counts.late ? 'is-urgent' : ''}"></span><span><strong>${counts.late} rental terlambat</strong><small>${counts.late ? 'Hubungi pelanggan dan catat pengembalian.' : 'Tidak ada keterlambatan saat ini.'}</small></span></div>`,
+    `<div class="followup-item"><span class="followup-indicator ${counts.dueSoon ? 'is-soon' : ''}"></span><span><strong>${counts.dueSoon} jatuh tempo dalam 3 hari</strong><small>${counts.dueSoon ? 'Ingatkan pelanggan sebelum jadwal kembali.' : 'Belum ada jadwal dekat.'}</small></span></div>`,
+    `<div class="followup-item"><span class="followup-indicator ${outstanding ? 'is-soon' : ''}"></span><span><strong>${state.unpaid.length} tagihan denda terbuka</strong><small>Sisa ${currency.format(outstanding)}${outstanding ? ' menunggu pembayaran.' : ' — semua tagihan lunas.'}</small></span></div>`
+  ];
+  document.querySelector('#seller-followup').innerHTML = reminders.join('');
 }
 
 async function loadCustomers() {
@@ -213,6 +268,7 @@ async function loadUnpaid() {
   ).join('');
   if (previous) select.value = previous;
   updatePaymentBalance();
+  renderSellerFollowup();
 }
 
 async function loadJournals() {
@@ -615,6 +671,15 @@ function initialize() {
 
   document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
   document.querySelectorAll('[data-go]').forEach(button => button.addEventListener('click', () => showView(button.dataset.go)));
+  document.querySelectorAll('[data-rental-filter]').forEach(button => button.addEventListener('click', () => {
+    state.rentalFilter = button.dataset.rentalFilter;
+    document.querySelectorAll('[data-rental-filter]').forEach(filter => {
+      const isActive = filter === button;
+      filter.classList.toggle('is-active', isActive);
+      filter.setAttribute('aria-pressed', String(isActive));
+    });
+    renderDueTable();
+  }));
   document.querySelector('#refresh-data').addEventListener('click', refreshFromButton);
   document.querySelector('#rental-date').addEventListener('change', () => {
     syncDateLimits();

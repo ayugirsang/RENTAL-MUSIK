@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=blue-black-2">
-  <script src="script.js?v=date-zone-1" defer></script>
+  <link rel="stylesheet" href="style.css?v=seller-dashboard-1">
+  <script src="script.js?v=seller-dashboard-1" defer></script>
    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
    <script src="config.js"></script>
 </head>
@@ -42,21 +42,29 @@
 
       <section class="view is-visible" id="view-dashboard" aria-labelledby="dashboard-title">
         <div class="page-heading">
-          <div><div class="eyebrow">PUSAT KENDALI</div><h1 id="dashboard-title">Selamat datang kembali.</h1><p>Pantau pengembalian, denda, dan arus jurnal hari ini.</p></div>
+          <div><div class="eyebrow">RUANG KERJA PENJUAL</div><h1 id="dashboard-title">Ringkasan usaha hari ini.</h1><p>Pantau penyewaan, stok alat, dan hal yang perlu ditindaklanjuti.</p></div>
           <button class="button button-dark" type="button" data-go="transactions"><span aria-hidden="true">＋</span> Transaksi baru</button>
         </div>
         <div class="metric-grid">
-          <article class="metric metric-green"><div class="metric-top"><span>Denda diterima</span><span class="metric-icon">↗</span></div><strong id="metric-income">Rp0</strong><div class="metric-foot"><span class="metric-dot"></span>Total pembayaran denda yang sudah diterima</div></article>
-          <article class="metric metric-paper"><div class="metric-top"><span>Penyewaan terlambat</span><span class="metric-icon icon-coral">⌁</span></div><strong id="metric-late">0</strong><div class="metric-foot">Belum dikembalikan melewati jadwal</div></article>
-          <article class="metric metric-paper"><div class="metric-top"><span>Alat sedang disewa</span><span class="metric-icon icon-yellow">♫</span></div><strong id="metric-rented">0</strong><div class="metric-foot">Unit aktif di luar inventaris</div></article>
+          <article class="metric metric-green"><div class="metric-top"><span>Penyewaan aktif</span><span class="metric-icon">↗</span></div><strong id="metric-active">0</strong><div class="metric-foot"><span class="metric-dot"></span>Sedang berjalan</div></article>
+          <article class="metric metric-paper"><div class="metric-top"><span>Jatuh tempo ≤ 3 hari</span><span class="metric-icon icon-yellow">◷</span></div><strong id="metric-due-soon">0</strong><div class="metric-foot">Siapkan pengembalian</div></article>
+          <article class="metric metric-paper"><div class="metric-top"><span>Terlambat</span><span class="metric-icon icon-coral">⌁</span></div><strong id="metric-late">0</strong><div class="metric-foot">Perlu segera ditindaklanjuti</div></article>
+          <article class="metric metric-paper"><div class="metric-top"><span>Alat tersedia</span><span class="metric-icon icon-yellow">♫</span></div><strong id="metric-available">0</strong><div class="metric-foot">Siap disewakan</div></article>
+          <article class="metric metric-paper"><div class="metric-top"><span>Denda diterima</span><span class="metric-icon">Rp</span></div><strong id="metric-income">Rp0</strong><div class="metric-foot">Pembayaran yang sudah masuk</div></article>
         </div>
         <div class="dashboard-grid">
           <section class="panel due-panel">
-            <div class="panel-heading"><div><div class="eyebrow">PERLU DITINDAKLANJUTI</div><h2>Jadwal pengembalian</h2></div><button class="text-button" type="button" data-go="transactions">Buka transaksi <span>→</span></button></div>
-            <div class="table-wrap"><table><thead><tr><th>PENYEWA</th><th>JATUH TEMPO</th><th>NILAI SEWA</th><th>STATUS</th></tr></thead><tbody id="due-table"><tr><td colspan="4" class="empty-cell">Memuat data...</td></tr></tbody></table></div>
+            <div class="panel-heading"><div><div class="eyebrow">PANTAU OPERASIONAL</div><h2>Jadwal pengembalian</h2></div><button class="text-button" type="button" data-go="transactions">Kelola rental <span>→</span></button></div>
+            <div class="dashboard-filters" role="group" aria-label="Filter jadwal pengembalian">
+              <button class="dashboard-filter is-active" type="button" data-rental-filter="all" aria-pressed="true">Semua <span id="count-rentals">0</span></button>
+              <button class="dashboard-filter" type="button" data-rental-filter="soon" aria-pressed="false">Segera <span id="count-due-soon">0</span></button>
+              <button class="dashboard-filter" type="button" data-rental-filter="late" aria-pressed="false">Terlambat <span id="count-late">0</span></button>
+            </div>
+            <div class="table-wrap"><table><thead><tr><th>PELANGGAN / RENTAL</th><th>JATUH TEMPO</th><th>NILAI SEWA</th><th>STATUS</th></tr></thead><tbody id="due-table"><tr><td colspan="4" class="empty-cell">Memuat data...</td></tr></tbody></table></div>
+            <div id="due-caption" class="due-caption">Pengingat jatuh tempo mencakup hari ini hingga 3 hari ke depan.</div>
           </section>
-          <aside class="note-panel">
-            <div class="note-mark" aria-hidden="true">♫</div><div class="eyebrow">CATATAN AKUNTANSI</div><h2>Denda diakui saat pengembalian.</h2><p>Piutang denda dan pendapatan tercatat otomatis. Saat pembayaran diterima, jurnal memindahkan saldo piutang ke kas.</p><button class="text-button note-link" type="button" data-go="reports">Lihat jurnal <span>→</span></button>
+          <aside class="note-panel seller-followup">
+            <div class="note-mark" aria-hidden="true">✓</div><div class="eyebrow">DAFTAR TINDAK LANJUT</div><h2>Ringkas, lalu lanjutkan pekerjaan.</h2><div id="seller-followup" class="followup-list"><span class="followup-item">Memuat aktivitas hari ini...</span></div><button class="button button-outline button-small followup-action" type="button" data-go="transactions">Buka operasional <span>→</span></button>
           </aside>
         </div>
       </section>
