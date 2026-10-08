@@ -33,24 +33,38 @@ function isValidDate(value) {
     && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
 }
 
+async function getTotalFinePayments() {
+  let total = 0;
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from('pembayaran_denda')
+      .select('id_pembayaran, jumlah_bayar')
+      .order('id_pembayaran')
+      .range(offset, offset + pageSize - 1);
+    if (error) return { total, error };
+    total += data.reduce((sum, payment) => sum + Number(payment.jumlah_bayar), 0);
+    if (data.length < pageSize) return { total, error: null };
+  }
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'ritme-api', time: new Date().toISOString() });
 });
 
 app.get('/api/dashboard', async (_req, res) => {
-  const [returnsResult, rentalsResult, equipmentResult] = await Promise.all([
-    supabase.from('pengembalian').select('total_denda'),
+  const [paymentsResult, rentalsResult, equipmentResult] = await Promise.all([
+    getTotalFinePayments(),
     supabase.from('penyewaan').select('id_sewa, tgl_rencana_kembali').eq('status_sewa', 'Berlangsung'),
     supabase.from('alat_musik').select('id_alat').eq('status', 'Disewa')
   ]);
-  const error = returnsResult.error || rentalsResult.error || equipmentResult.error;
+  const error = paymentsResult.error || rentalsResult.error || equipmentResult.error;
   if (error) return sendDatabaseError(res, error, 500);
 
   const today = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
   }).format(new Date());
   res.json({
-    totalPendapatanDenda: returnsResult.data.reduce((sum, row) => sum + Number(row.total_denda), 0),
+    totalDendaDibayar: paymentsResult.total,
     penyewaanTerlambat: rentalsResult.data.filter(row => row.tgl_rencana_kembali < today).length,
     alatDisewa: equipmentResult.data.length
   });
@@ -138,6 +152,7 @@ app.get('/api/pengembalian/belum-lunas', async (_req, res) => {
   res.json(returns.map(row => ({
     ...row,
     nama_pelanggan: customerByRental.get(row.id_sewa),
+    total_terbayar: paidByReturn.get(row.id_pengembalian) || 0,
     sisa_denda: Math.max(0, Number(row.total_denda) - (paidByReturn.get(row.id_pengembalian) || 0))
   })).filter(row => row.sisa_denda > 0));
 });

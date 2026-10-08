@@ -119,6 +119,12 @@ td small { display: block; margin-top: 4px; color: #969b91; font: 10px var(--mon
 .form-stack { display: grid; gap: 9px; }
 .field-label { display: block; margin: 2px 0 -3px; color: #555c52; font-size: 11px; font-weight: 600; }
 .field-hint { margin-top: -5px; color: #858b80; font-size: 10px; line-height: 1.45; }
+.payment-summary { padding: 9px 10px; border: 1px solid #dfe7f2; border-radius: 3px; background: #f7f9fd; color: #4b5870; font-size: 10px; line-height: 1.5; }
+.payment-summary[hidden] { display: none; }
+.payment-quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: -4px; }
+.payment-quick-button { min-height: 32px; padding: 0 8px; border: 1px solid #cfdaea; border-radius: 3px; background: #fff; color: #2457bd; cursor: pointer; font-size: 10px; font-weight: 600; }
+.payment-quick-button:hover:not(:disabled) { background: #edf3ff; }
+.payment-quick-button:disabled { cursor: not-allowed; opacity: .55; }
 .required { color: #cb6652; }
 input, select { width: 100%; min-width: 0; height: 39px; padding: 0 10px; border: 1px solid #dfe2d9; border-radius: 3px; outline: none; background: #fff; color: #30362e; font-size: 12px; }
 input:focus, select:focus { border-color: #87975c; box-shadow: 0 0 0 2px #e8efcf; }
