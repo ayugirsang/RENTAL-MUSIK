@@ -177,7 +177,7 @@ Di GitHub Pages, frontend mengakses Supabase langsung menggunakan publishable ke
    PORT=3000
    ```
 
-4. Untuk database baru, jalankan [`backend/database/schema.sql`](./backend/database/schema.sql) melalui Supabase SQL Editor. Skrip ini membuat tabel, fungsi, trigger, kebijakan demo, dan inventaris contoh.
+4. Untuk database baru, jalankan berurutan [`backend/schema.sql`](./backend/schema.sql), [`backend/triggers.sql`](./backend/triggers.sql), lalu [`backend/seed.sql`](./backend/seed.sql) melalui Supabase SQL Editor. File-file itu menyiapkan tabel dan RLS, fungsi bisnis serta trigger, lalu data awal alat musik.
 
 5. Jalankan server dari root repository dan buka [http://localhost:3000](http://localhost:3000):
 
@@ -185,9 +185,9 @@ Di GitHub Pages, frontend mengakses Supabase langsung menggunakan publishable ke
    npm start
    ```
 
-Jika database sudah ada, jalankan [`backend/database/migrations/20261011_add_rental_payment_accounting.sql`](./backend/database/migrations/20261011_add_rental_payment_accounting.sql) **sekali** melalui Supabase SQL Editor sebelum menggunakan versi aplikasi ini. Migrasi menambahkan tabel pembayaran sewa dan kolom jurnal; rental lama ditandai **Belum Dicatat** agar histori yang tidak diketahui tidak diasumsikan sudah dibayar.
+Jika database sudah ada, jalankan [`backend/migrations/20261011_add_rental_payment_accounting.sql`](./backend/migrations/20261011_add_rental_payment_accounting.sql) **sekali** melalui Supabase SQL Editor sebelum menggunakan versi aplikasi ini. Migrasi menambahkan tabel pembayaran sewa dan kolom jurnal; rental lama ditandai **Belum Dicatat** agar histori yang tidak diketahui tidak diasumsikan sudah dibayar.
 
-Untuk menambahkan delapan instrumen contoh ke database yang sudah pernah dibuat, jalankan sekali [`backend/database/migrations/20261008_add_more_instruments.sql`](./backend/database/migrations/20261008_add_more_instruments.sql) melalui Supabase SQL Editor. Migrasi tersebut tidak menggandakan alat dengan nama yang sama.
+Untuk menambahkan delapan instrumen contoh ke database yang sudah pernah dibuat, jalankan sekali [`backend/migrations/20261008_add_more_instruments.sql`](./backend/migrations/20261008_add_more_instruments.sql) melalui Supabase SQL Editor. Migrasi tersebut tidak menggandakan alat dengan nama yang sama.
 
 ## Pemeriksaan proyek
 
@@ -211,11 +211,11 @@ URL demo proyek: <https://ayugirsang.github.io/RENTAL-MUSIK/>.
 
 ```text
 backend/
-  api/
-    app.js                              API Express
-  database/
-    schema.sql                          Skema, fungsi, trigger, dan data contoh Supabase
-    migrations/                         Migrasi database Supabase
+  app.js                                API Express
+  schema.sql                            Tabel, relasi, indeks, dan RLS Supabase
+  triggers.sql                         Fungsi bisnis dan trigger database
+  seed.sql                              Data awal alat musik demo
+  migrations/                           Migrasi database Supabase
 frontend/
   index.html                            Halaman utama aplikasi
   css/
@@ -223,7 +223,8 @@ frontend/
   img/
     logo.svg                            Logo aplikasi
   js/
-    app.js                              Logika aplikasi dan integrasi data
+    supabase.js                         Inisialisasi koneksi Supabase frontend
+    app.js                              Logika aplikasi
     config.example.js                   Contoh konfigurasi Supabase frontend
 .github/workflows/                      Pemeriksaan dan deployment otomatis
 index.html                              Pengalih ke frontend/ untuk hosting root statis
@@ -233,6 +234,6 @@ package.json, package-lock.json         Dependensi dan perintah proyek
 
 ## Batasan keamanan demo
 
-Aplikasi ini belum menggunakan login. Kebijakan pada [`backend/database/schema.sql`](./backend/database/schema.sql) dan migrasi demo mengizinkan akses data melalui role Supabase `anon` agar aplikasi akademik dapat dicoba. Catatan pembayaran sewa hanya dapat dibaca dan ditambahkan dari aplikasi agar histori jurnalnya tidak dapat diubah atau dihapus melalui client. **Jangan gunakan konfigurasi ini untuk menyimpan data usaha nyata atau data sensitif.** Untuk penggunaan produksi, tambahkan autentikasi Supabase dan batasi Row Level Security (RLS) sesuai peran pengguna.
+Aplikasi ini belum menggunakan login. Kebijakan pada [`backend/schema.sql`](./backend/schema.sql) dan migrasi demo mengizinkan akses data melalui role Supabase `anon` agar aplikasi akademik dapat dicoba. Catatan pembayaran sewa hanya dapat dibaca dan ditambahkan dari aplikasi agar histori jurnalnya tidak dapat diubah atau dihapus melalui client. **Jangan gunakan konfigurasi ini untuk menyimpan data usaha nyata atau data sensitif.** Untuk penggunaan produksi, tambahkan autentikasi Supabase dan batasi Row Level Security (RLS) sesuai peran pengguna.
 
 Jangan pernah memasukkan `service_role` key atau file `.env` ke repository, frontend, maupun konfigurasi publik.

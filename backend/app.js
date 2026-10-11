@@ -22,7 +22,7 @@ app.get('/js/config.js', (_req, res) => {
     supabasePublishableKey: SUPABASE_PUBLISHABLE_KEY
   })};\n`);
 });
-app.use(express.static(path.join(__dirname, '..', '..', 'frontend')));
+app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 function sendDatabaseError(res, error, status = 400) {
   console.error(error);
