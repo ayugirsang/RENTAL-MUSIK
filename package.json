@@ -2,11 +2,11 @@
   "name": "tugas-pengkodean",
   "version": "1.0.0",
   "description": "",
-  "main": "app.js",
+  "main": "backend/app.js",
   "scripts": {
-    "start": "node app.js",
-    "check": "node --check app.js",
-    "test": "node --check app.js"
+    "start": "node backend/app.js",
+    "check": "node --check backend/app.js",
+    "test": "node --check backend/app.js && node --check frontend/script.js"
   },
   "keywords": [],
   "author": "",

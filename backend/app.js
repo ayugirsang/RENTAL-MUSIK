@@ -16,7 +16,7 @@ const port = process.env.PORT || 3000;
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 function sendDatabaseError(res, error, status = 400) {
   console.error(error);

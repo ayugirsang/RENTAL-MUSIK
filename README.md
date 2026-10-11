@@ -46,6 +46,97 @@ Repository berisi kode sumber, skema database, panduan, dan konfigurasi deployme
 
 **Data rental sebelum fitur pembayaran sewa:** status pembayarannya diinisialisasi sebagai **Belum Dicatat**, bukan dianggap lunas atau belum lunas. Pembayaran yang dimasukkan setelah migrasi untuk rental lama menggunakan basis kas, sehingga penerimaan tersebut tidak membuat saldo piutang akrual yang tidak memiliki catatan awal.
 
+## Entity Relationship Diagram (ERD)
+
+ERD berikut menggambarkan tabel, primary key (PK), foreign key (FK), dan relasi pada skema Supabase aplikasi.
+
+```mermaid
+erDiagram
+    pelanggan {
+        bigint id_pelanggan PK
+        text nama
+        text no_hp
+        text alamat
+        timestamptz created_at
+    }
+    alat_musik {
+        bigint id_alat PK
+        text nama_alat
+        numeric harga_sewa_per_hari
+        numeric denda_per_hari
+        text status
+        timestamptz created_at
+    }
+    penyewaan {
+        bigint id_sewa PK
+        bigint id_pelanggan FK
+        date tgl_sewa
+        date tgl_rencana_kembali
+        numeric total_biaya
+        text status_sewa
+        text status_pembayaran_sewa
+        text basis_pencatatan
+        timestamptz created_at
+    }
+    detail_penyewaan {
+        bigint id_detail PK
+        bigint id_sewa FK
+        bigint id_alat FK
+        integer jumlah
+        numeric subtotal
+    }
+    pengembalian {
+        bigint id_pengembalian PK
+        bigint id_sewa FK
+        date tgl_kembali_aktual
+        integer hari_terlambat
+        numeric total_denda
+        text status_pembayaran_denda
+        timestamptz created_at
+    }
+    pembayaran_sewa {
+        bigint id_pembayaran_sewa PK
+        bigint id_sewa FK
+        date tgl_bayar
+        numeric jumlah_bayar
+        text metode_bayar
+        timestamptz created_at
+    }
+    pembayaran_denda {
+        bigint id_pembayaran PK
+        bigint id_pengembalian FK
+        date tgl_bayar
+        numeric jumlah_bayar
+        text metode_bayar
+        timestamptz created_at
+    }
+    jurnal_akuntansi {
+        bigint id_jurnal PK
+        bigint id_pengembalian FK
+        bigint id_sewa FK
+        bigint id_pembayaran_sewa FK
+        date tgl_jurnal
+        text kode_akun
+        text nama_akun
+        numeric debit
+        numeric kredit
+        text keterangan
+        timestamptz created_at
+    }
+
+    pelanggan ||--o{ penyewaan : melakukan
+    penyewaan ||--o{ detail_penyewaan : memiliki
+    alat_musik ||--o{ detail_penyewaan : disewakan
+    penyewaan ||--o| pengembalian : dikembalikan
+    penyewaan ||--o{ pembayaran_sewa : menerima
+    pengembalian ||--o{ pembayaran_denda : menerima
+    penyewaan o|--o{ jurnal_akuntansi : sumber_sewa
+    pengembalian o|--o{ jurnal_akuntansi : sumber_denda
+    pembayaran_sewa o|--o{ jurnal_akuntansi : sumber_pembayaran
+```
+
+Satu penyewaan dapat berisi beberapa alat melalui `detail_penyewaan`. Pengembalian dibatasi maksimal satu untuk setiap penyewaan. Tabel jurnal menyimpan baris debit/kredit dan dapat merujuk ke penyewaan, pengembalian, atau pembayaran sewa sesuai transaksi sumbernya.
+
 ## Teknologi
 
 - **Frontend:** HTML, CSS, JavaScript (tanpa framework)
@@ -86,23 +177,23 @@ Di GitHub Pages, frontend mengakses Supabase langsung menggunakan publishable ke
    PORT=3000
    ```
 
-4. Untuk database baru, jalankan [`schema.sql`](./schema.sql) melalui Supabase SQL Editor. Skrip ini membuat tabel, fungsi, trigger, kebijakan demo, dan inventaris contoh.
+4. Untuk database baru, jalankan [`backend/schema.sql`](./backend/schema.sql) melalui Supabase SQL Editor. Skrip ini membuat tabel, fungsi, trigger, kebijakan demo, dan inventaris contoh.
 
-5. Jalankan server dan buka [http://localhost:3000](http://localhost:3000):
+5. Jalankan server dari root repository dan buka [http://localhost:3000](http://localhost:3000):
 
    ```powershell
    npm start
    ```
 
-Jika database sudah ada, jalankan [`migrations/20261011_add_rental_payment_accounting.sql`](./migrations/20261011_add_rental_payment_accounting.sql) **sekali** melalui Supabase SQL Editor sebelum menggunakan versi aplikasi ini. Migrasi menambahkan tabel pembayaran sewa dan kolom jurnal; rental lama ditandai **Belum Dicatat** agar histori yang tidak diketahui tidak diasumsikan sudah dibayar.
+Jika database sudah ada, jalankan [`backend/migrations/20261011_add_rental_payment_accounting.sql`](./backend/migrations/20261011_add_rental_payment_accounting.sql) **sekali** melalui Supabase SQL Editor sebelum menggunakan versi aplikasi ini. Migrasi menambahkan tabel pembayaran sewa dan kolom jurnal; rental lama ditandai **Belum Dicatat** agar histori yang tidak diketahui tidak diasumsikan sudah dibayar.
 
-Untuk menambahkan delapan instrumen contoh ke database yang sudah pernah dibuat, jalankan sekali [`migrations/20261008_add_more_instruments.sql`](./migrations/20261008_add_more_instruments.sql) melalui Supabase SQL Editor. Migrasi tersebut tidak menggandakan alat dengan nama yang sama.
+Untuk menambahkan delapan instrumen contoh ke database yang sudah pernah dibuat, jalankan sekali [`backend/migrations/20261008_add_more_instruments.sql`](./backend/migrations/20261008_add_more_instruments.sql) melalui Supabase SQL Editor. Migrasi tersebut tidak menggandakan alat dengan nama yang sama.
 
 ## Pemeriksaan proyek
 
 ```powershell
 npm test
-node --check public\script.js
+node --check frontend\script.js
 git diff --check
 ```
 
@@ -116,21 +207,25 @@ Repository ini memiliki workflow **Deploy GitHub Pages**. Untuk menyiapkan deplo
 
 URL demo proyek: <https://ayugirsang.github.io/RENTAL-MUSIK/>.
 
-## Struktur penting repository
+## Struktur repository
 
 ```text
-app.js                                  API Express
-public/                                 Frontend aplikasi
-schema.sql                              Skema, fungsi, trigger, dan data contoh Supabase
-migrations/20261008_add_more_instruments.sql
-                                        Migrasi alat musik untuk database yang sudah ada
-migrations/20261011_add_rental_payment_accounting.sql
-                                        Migrasi pembayaran sewa dan jurnal umum
+backend/
+  app.js                                API Express
+  schema.sql                            Skema, fungsi, trigger, dan data contoh Supabase
+  migrations/                           Migrasi database Supabase
+frontend/
+  index.html                            Halaman utama aplikasi
+  script.js                             Logika aplikasi dan integrasi data
+  style.css                             Tampilan aplikasi
 .github/workflows/                      Pemeriksaan dan deployment otomatis
+index.html                              Pengalih ke frontend/ untuk hosting root statis
+package.json, package-lock.json         Dependensi dan perintah proyek
+.env.example                            Contoh konfigurasi server lokal
 ```
 
 ## Batasan keamanan demo
 
-Aplikasi ini belum menggunakan login. Kebijakan pada [`schema.sql`](./schema.sql) dan migrasi demo mengizinkan akses data melalui role Supabase `anon` agar aplikasi akademik dapat dicoba. Catatan pembayaran sewa hanya dapat dibaca dan ditambahkan dari aplikasi agar histori jurnalnya tidak dapat diubah atau dihapus melalui client. **Jangan gunakan konfigurasi ini untuk menyimpan data usaha nyata atau data sensitif.** Untuk penggunaan produksi, tambahkan autentikasi Supabase dan batasi Row Level Security (RLS) sesuai peran pengguna.
+Aplikasi ini belum menggunakan login. Kebijakan pada [`backend/schema.sql`](./backend/schema.sql) dan migrasi demo mengizinkan akses data melalui role Supabase `anon` agar aplikasi akademik dapat dicoba. Catatan pembayaran sewa hanya dapat dibaca dan ditambahkan dari aplikasi agar histori jurnalnya tidak dapat diubah atau dihapus melalui client. **Jangan gunakan konfigurasi ini untuk menyimpan data usaha nyata atau data sensitif.** Untuk penggunaan produksi, tambahkan autentikasi Supabase dan batasi Row Level Security (RLS) sesuai peran pengguna.
 
 Jangan pernah memasukkan `service_role` key atau file `.env` ke repository, frontend, maupun konfigurasi publik.
