@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=rental-accounting-1">
-  <script src="js/app.js?v=rental-accounting-1" defer></script>
+  <link rel="stylesheet" href="css/style.css?v=instrument-gallery-1">
+  <script src="js/app.js?v=instrument-gallery-1" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase.js"></script>
@@ -50,6 +50,19 @@
           <div><div class="eyebrow">RUANG KERJA PENJUAL</div><h1 id="dashboard-title">Ringkasan usaha hari ini.</h1><p>Pantau penyewaan, stok alat, dan hal yang perlu ditindaklanjuti.</p></div>
           <button class="button button-dark" type="button" data-go="transactions"><span aria-hidden="true">＋</span> Transaksi baru</button>
         </div>
+        <section class="instrument-hero" aria-labelledby="instrument-hero-title">
+          <div class="instrument-hero-copy">
+            <div class="eyebrow">KOLEKSI RITME</div>
+            <h2 id="instrument-hero-title">Temukan suara untuk cerita berikutnya.</h2>
+            <p>Dari petikan gitar hingga dentuman drum, pilih alat musik yang paling pas untuk kebutuhanmu.</p>
+            <button class="button button-hero" type="button" data-go="transactions">Jelajahi alat musik <span aria-hidden="true">→</span></button>
+          </div>
+          <div class="instrument-hero-gallery" aria-label="Pilihan alat musik">
+            <img class="hero-photo-main" src="img/instruments/guitar.jpg" alt="Gitar elektrik dan amplifier di studio">
+            <img src="img/instruments/keyboard.jpg" alt="Papan tuts keyboard musik">
+            <img src="img/instruments/drums.jpg" alt="Set drum akustik" loading="lazy">
+          </div>
+        </section>
         <div class="metric-grid">
           <article class="metric metric-green"><div class="metric-top"><span>Pendapatan bulan ini</span><span class="metric-icon">↗</span></div><strong id="metric-month-revenue">Rp0</strong><div class="metric-foot">Sewa dan denda yang diakui</div></article>
           <article class="metric metric-paper"><div class="metric-top"><span>Kas masuk bulan ini</span><span class="metric-icon">Rp</span></div><strong id="metric-month-cash">Rp0</strong><div class="metric-foot">Pembayaran sewa dan denda</div></article>

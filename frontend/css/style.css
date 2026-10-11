@@ -566,3 +566,48 @@ input:focus, select:focus { box-shadow: 0 0 0 3px #2864e81a; }
   .instrument-art svg { width: 31px; height: 31px; }
   .equipment-name { font-size: 11px; }
 }
+
+.instrument-hero {
+  display: grid;
+  grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr);
+  gap: 26px;
+  align-items: center;
+  min-height: 238px;
+  margin: 0 0 19px;
+  padding: 24px;
+  overflow: hidden;
+  border: 1px solid #233b5a;
+  border-radius: 14px;
+  background: linear-gradient(120deg, #101e33, #1a3452);
+  color: #fff;
+}
+.instrument-hero-copy { max-width: 440px; }
+.instrument-hero .eyebrow { color: #a9c8f5; }
+.instrument-hero h2 { margin: 10px 0 8px; font: 700 clamp(21px, 2.5vw, 30px)/1.16 var(--serif); letter-spacing: -.5px; }
+.instrument-hero p { max-width: 385px; margin: 0 0 17px; color: #c1cde0; font-size: 12px; line-height: 1.65; }
+.button-hero { min-height: 38px; border-radius: 8px; background: #dce8ff; color: #142744; }
+.button-hero:hover { background: #fff; }
+.instrument-hero-gallery { display: grid; min-width: 0; height: 188px; grid-template-columns: 1.15fr .85fr; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.instrument-hero-gallery img { width: 100%; height: 100%; min-height: 0; object-fit: cover; border-radius: 9px; }
+.instrument-hero-gallery .hero-photo-main { grid-row: 1 / -1; }
+.instrument-photo { overflow: hidden; border: 1px solid #e5eaf2; background: #edf2f8; }
+.instrument-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.instrument-art.instrument-photo { width: 76px; height: 56px; flex-basis: 76px; border-radius: 8px; }
+.equipment-option { min-height: 70px; gap: 10px; padding: 7px 9px; border-color: #e1e7f0; background: linear-gradient(110deg, #fff, #fbfcff); }
+.equipment-option:has(input:checked) { border-color: #80a2e9; background: #f1f6ff; box-shadow: 0 0 0 2px #2864e80c; }
+.equipment-option input:focus-visible + .check-box { outline: 3px solid #8db2ff; outline-offset: 2px; }
+.equipment-option .check-box { border-color: #c3cddd; }
+.equipment-name { color: #243148; font-size: 12px; }
+.equipment-name small { color: #7c899d; font-size: 10px; }
+.equipment-option strong { color: #2457bd; font-size: 10px; }
+
+@media (max-width: 820px) {
+  .instrument-hero { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 17px; padding: 20px; }
+  .instrument-hero-gallery { height: 166px; }
+}
+@media (max-width: 560px) {
+  .instrument-hero { grid-template-columns: 1fr; gap: 18px; padding: 20px 17px; }
+  .instrument-hero-gallery { height: 155px; }
+  .instrument-art.instrument-photo { width: 58px; height: 50px; flex-basis: 58px; }
+  .equipment-option { gap: 7px; padding: 7px; }
+}

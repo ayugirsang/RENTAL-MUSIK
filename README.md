@@ -222,7 +222,8 @@ RENTAL-MUSIK/
 │   ├── css/
 │   │   └── style.css                    Gaya dan tata letak aplikasi
 │   ├── img/
-│   │   └── logo.svg                     Logo Ritme
+│   │   ├── logo.svg                     Logo Ritme
+│   │   └── instruments/                 Foto alat musik untuk demo dan pilihan rental
 │   └── js/
 │       ├── supabase.js                  Inisialisasi koneksi Supabase
 │       ├── app.js                       Dashboard, rental, inventaris, dan akuntansi
@@ -239,6 +240,8 @@ RENTAL-MUSIK/
 ```
 
 **Catatan:** aplikasi frontend saat ini menggabungkan fitur dashboard, transaksi rental, inventaris, pembayaran, jurnal, buku besar, dan laporan di `frontend/js/app.js`. File fitur terpisah seperti `dashboard.js` atau `pembayaran.js` tidak dibuat karena aplikasi ini tidak menggunakan arsitektur multi-modul seperti contoh sistem padel.
+
+Foto instrumen diambil dari [Unsplash](https://unsplash.com/license) dan disimpan lokal di `frontend/img/instruments/` agar demo tidak perlu memuat gambar dari layanan eksternal.
 
 ## Batasan keamanan demo
 

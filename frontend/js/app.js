@@ -456,6 +456,10 @@ function renderEquipment() {
 
 function instrumentArtwork(name) {
   const normalized = String(name).toLowerCase();
+  const photo = instrumentPhoto(normalized);
+  if (photo) {
+    return `<span class="instrument-art instrument-photo" aria-hidden="true"><img src="img/instruments/${photo}" alt="" loading="lazy"></span>`;
+  }
   if (/keyboard|piano|organ/.test(normalized)) {
     return '<span class="instrument-art art-keys" aria-hidden="true"><svg viewBox="0 0 64 64"><rect x="8" y="18" width="48" height="29" rx="5"/><path d="M14 22v20m8-20v20m8-20v20m8-20v20m8-20v20m8-20v20M14 31h36"/><path class="art-detail" d="M18 22v10m8-10v10m8-10v10m8-10v10m8-10v10"/></svg></span>';
   }
@@ -478,6 +482,20 @@ function instrumentArtwork(name) {
     return '<span class="instrument-art art-strings" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M37 12 49 7l2 3-9 9 4 5c5 5 4 12-1 16-3 3-7 4-11 2l-5 8c-5 6-13 4-17-1s-3-12 3-16l8-5c-2-4-1-9 2-12 4-4 10-5 15-1z"/><path d="M37 12 17 51M24 26l15 14"/><circle cx="36" cy="32" r="4"/><path class="art-detail" d="M42 9 28 28m4 4 15 13"/></svg></span>';
   }
   return '<span class="instrument-art art-default" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M14 40c0-4 3-7 7-7h5l5-19h5l5 19h3c4 0 7 3 7 7s-3 7-7 7H21c-4 0-7-3-7-7z"/><path d="M32 14h6m-9 13h12m-8-6h4"/></svg></span>';
+}
+
+function instrumentPhoto(name) {
+  if (/keyboard|piano|organ/.test(name)) return 'keyboard.jpg';
+  if (/cajon|conga|bongo|perkusi/.test(name)) return 'percussion.jpg';
+  if (/drum/.test(name)) return 'drums.jpg';
+  if (/mikrofon|microphone/.test(name)) return 'microphone.jpg';
+  if (/sax|saksofon|klarinet|clarinet/.test(name)) return 'saxophone.jpg';
+  if (/terompet|trompet|trumpet/.test(name)) return 'trumpet.jpg';
+  if (/flute|seruling|suling/.test(name)) return 'flute.jpg';
+  if (/biola|violin|cello|selo/.test(name)) return 'violin.jpg';
+  if (/ampli|speaker|pengeras suara/.test(name)) return 'amplifier.jpg';
+  if (/gitar|guitar|bass|ukulele|uke/.test(name)) return 'guitar.jpg';
+  return null;
 }
 
 async function addEquipment() {
