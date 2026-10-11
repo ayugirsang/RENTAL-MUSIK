@@ -16,7 +16,13 @@ const port = process.env.PORT || 3000;
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'frontend')));
+app.get('/js/config.js', (_req, res) => {
+  res.type('application/javascript').send(`window.RITME_CONFIG = ${JSON.stringify({
+    supabaseUrl: SUPABASE_URL,
+    supabasePublishableKey: SUPABASE_PUBLISHABLE_KEY
+  })};\n`);
+});
+app.use(express.static(path.join(__dirname, '..', '..', 'frontend')));
 
 function sendDatabaseError(res, error, status = 400) {
   console.error(error);
