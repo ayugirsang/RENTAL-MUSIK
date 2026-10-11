@@ -1,22 +1,76 @@
-# Ritme - Rental & Accounting
+# Ritme — Sistem Informasi Rental Alat Musik
 
-Sistem web untuk mengelola rental alat musik, pengembalian, denda keterlambatan, pembayaran, dan jurnal akuntansi. Inventaris awal mencakup gitar, bass, keyboard, drum, mikrofon, biola, ukulele, cajon, saksofon, trompet, seruling, ampli, dan speaker; penjual juga dapat menambahkan alat beserta tarif sewanya dari halaman Transaksi. Setiap alat ditampilkan dengan ilustrasi vektor berdasarkan jenisnya. Untuk menambahkan delapan instrumen contoh pada database Supabase yang sudah ada, jalankan [migrations/20261008_add_more_instruments.sql](./migrations/20261008_add_more_instruments.sql) melalui SQL Editor Supabase. Dashboard penjual merangkum rental aktif, jadwal jatuh tempo tiga hari ke depan, keterlambatan, stok alat tersedia, dan pembayaran denda yang diterima. Jadwal dapat difilter berdasarkan status, sementara daftar tindak lanjut menyorot rental terlambat, pengembalian dekat, dan tagihan denda terbuka. Menu **Detail & laporan** menyediakan riwayat cicilan per tagihan, riwayat penyewaan pelanggan, performa tiap alat, serta rekap denda dan piutang yang dapat difilter tanggal dan diunduh sebagai CSV.
+**Ritme** adalah aplikasi web untuk membantu penjual mengelola usaha rental alat musik. Aplikasi mencatat pelanggan, inventaris, transaksi penyewaan, pengembalian, denda keterlambatan, pembayaran cicilan denda, serta jurnal dan laporan.
 
-## Kebutuhan
+> Proyek ini dibuat sebagai aplikasi demo/tugas akademik. Data tersimpan di Supabase.
 
-- Node.js
+## Tautan proyek
+
+- **Repository GitHub:** [ayugirsang/RENTAL-MUSIK](https://github.com/ayugirsang/RENTAL-MUSIK)
+- **Aplikasi demo:** [ayugirsang.github.io/RENTAL-MUSIK](https://ayugirsang.github.io/RENTAL-MUSIK/)
+
+Repository berisi kode sumber, skema database, panduan, dan konfigurasi deployment. Tautan demo digunakan untuk mencoba aplikasinya.
+
+## Fitur
+
+| Menu/fitur | Penjelasan |
+| --- | --- |
+| **Ringkasan penjual** | Menampilkan jumlah penyewaan aktif, alat tersedia, pengembalian yang segera jatuh tempo, keterlambatan, dan pembayaran denda yang diterima. Daftar jadwal dapat difilter dan dilengkapi tindak lanjut. |
+| **Pelanggan** | Menambahkan dan memilih pelanggan untuk transaksi rental. |
+| **Inventaris alat musik** | Menyediakan contoh gitar, bass, keyboard, drum, mikrofon, biola, ukulele, cajon, saksofon, trompet, seruling, ampli, dan speaker. Penjual dapat menambahkan alat beserta tarif sewa dan denda per hari. Pilihan alat dilengkapi ilustrasi vektor. |
+| **Penyewaan** | Membuat penyewaan dari alat yang tersedia. Biaya dihitung dari tarif harian dan lama penyewaan. Alat yang dipilih berubah menjadi berstatus disewa. |
+| **Pengembalian** | Mencatat tanggal kembali, menghitung keterlambatan dan denda secara otomatis, menyelesaikan penyewaan, dan mengembalikan status alat menjadi tersedia. |
+| **Pembayaran denda** | Menerima pembayaran tunai, transfer, atau QRIS. Denda dapat dibayar bertahap; sistem menampilkan total tagihan, jumlah yang dibayar, dan sisanya serta menolak pembayaran melebihi sisa denda. |
+| **Detail & laporan** | Menampilkan riwayat cicilan per tagihan, riwayat penyewaan pelanggan, performa alat, serta laporan denda dan piutang dengan filter tanggal dan ekspor CSV. |
+| **Jurnal akuntansi** | Mencatat akrual denda dan pembayaran denda secara otomatis, serta menyediakan ringkasan debit/kredit dan ekspor CSV. |
+
+### Alur pencatatan denda
+
+1. Saat pengembalian dicatat, denda dihitung berdasarkan jumlah hari terlambat dan tarif denda alat.
+2. Denda yang timbul dicatat sebagai piutang dan pendapatan denda.
+3. Setiap pembayaran mengurangi piutang. Pembayaran sebagian menyisakan saldo sampai tagihan lunas.
+4. Status tagihan diperbarui menjadi **Belum Lunas**, **Sebagian**, atau **Lunas**.
+
+| Peristiwa | Debit | Kredit |
+| --- | --- | --- |
+| Denda diakui saat pengembalian | Piutang Denda (1130) | Pendapatan Denda Keterlambatan (4110) |
+| Pembayaran denda diterima | Kas (1110) | Piutang Denda (1130) |
+
+**Catatan:** aplikasi mencatat nilai/tagihan biaya sewa, tetapi belum memiliki pencatatan penerimaan pembayaran biaya sewa. Karena itu, nilai sewa tidak ditampilkan sebagai kas yang sudah diterima.
+
+## Teknologi
+
+- **Frontend:** HTML, CSS, JavaScript (tanpa framework)
+- **API/server lokal:** Node.js dan Express
+- **Database:** Supabase PostgreSQL
+- **Hosting demo:** GitHub Pages
+- **Pemeriksaan otomatis:** GitHub Actions
+
+Di GitHub Pages, frontend mengakses Supabase langsung menggunakan publishable key yang disediakan melalui konfigurasi GitHub Actions. Pada mode server, aplikasi menggunakan Express sebagai API.
+
+## Menjalankan secara lokal
+
+### Persiapan
+
+- Node.js dan npm
 - Project Supabase
-- Git (opsional, untuk mengirim kode ke GitHub)
 
-## Menjalankan aplikasi
+### Langkah
 
-1. Install dependensi:
+1. Clone repository dan masuk ke folder proyek:
+
+   ```powershell
+   git clone https://github.com/ayugirsang/RENTAL-MUSIK.git
+   cd RENTAL-MUSIK
+   ```
+
+2. Pasang dependensi:
 
    ```powershell
    npm install
    ```
 
-2. Salin `.env.example` menjadi `.env`, lalu isi kredensial Supabase:
+3. Buat file `.env` berdasarkan `.env.example`, lalu isi konfigurasi Supabase:
 
    ```env
    SUPABASE_URL=https://YOUR_PROJECT.supabase.co
@@ -24,54 +78,47 @@ Sistem web untuk mengelola rental alat musik, pengembalian, denda keterlambatan,
    PORT=3000
    ```
 
-3. Jalankan isi `schema.sql` melalui Supabase SQL Editor.
+4. Jalankan isi [`schema.sql`](./schema.sql) melalui Supabase SQL Editor untuk membuat tabel, fungsi, trigger, kebijakan demo, dan inventaris contoh.
 
-4. Jalankan server:
+5. Jalankan server dan buka [http://localhost:3000](http://localhost:3000):
 
    ```powershell
    npm start
    ```
 
-5. Buka aplikasi di [http://localhost:3000](http://localhost:3000).
+Untuk menambahkan delapan instrumen contoh ke database yang sudah pernah dibuat, jalankan sekali [`migrations/20261008_add_more_instruments.sql`](./migrations/20261008_add_more_instruments.sql) melalui Supabase SQL Editor. Migrasi tersebut tidak menggandakan alat dengan nama yang sama.
 
-## Pemeriksaan
+## Pemeriksaan proyek
 
 ```powershell
-npm run check
+npm test
+node --check public\script.js
+git diff --check
 ```
 
-## GitHub dan Supabase
+## Deployment GitHub Pages
 
-Kode aplikasi disimpan di GitHub, sedangkan data transaksi disimpan di Supabase. GitHub Actions hanya memeriksa kode; kredensial Supabase tetap disimpan sebagai environment variable dan tidak dimasukkan ke repository.
+Repository ini memiliki workflow **Deploy GitHub Pages**. Untuk menyiapkan deployment:
 
-Repository:
+1. Tambahkan repository secrets `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY` melalui **Settings → Secrets and variables → Actions**.
+2. Pastikan GitHub Pages menggunakan source **GitHub Actions** di **Settings → Pages**.
+3. Push perubahan ke branch `main`; workflow akan membangun konfigurasi frontend dan menerbitkan situs.
+
+URL demo proyek: <https://ayugirsang.github.io/RENTAL-MUSIK/>.
+
+## Struktur penting repository
 
 ```text
-https://github.com/ayugirsang/rental-musik.git
+app.js                                  API Express
+public/                                 Frontend aplikasi
+schema.sql                              Skema, fungsi, trigger, dan data contoh Supabase
+migrations/20261008_add_more_instruments.sql
+                                        Migrasi alat musik untuk database yang sudah ada
+.github/workflows/                      Pemeriksaan dan deployment otomatis
 ```
 
-Untuk mengirim perubahan:
+## Batasan keamanan demo
 
-```powershell
-git push -u origin main
-```
+Aplikasi ini belum menggunakan login. Kebijakan pada [`schema.sql`](./schema.sql) mengizinkan operasi data demo melalui role Supabase `anon` agar aplikasi akademik dapat dicoba. **Jangan gunakan konfigurasi ini untuk menyimpan data usaha nyata atau data sensitif.** Untuk penggunaan produksi, tambahkan autentikasi Supabase dan batasi Row Level Security (RLS) sesuai peran pengguna.
 
-File `.env` dan `node_modules` tidak dikirim ke GitHub. Jangan menaruh `service_role` key di repository atau di browser.
-
-## Deploy menjadi link publik
-
-Untuk tampilan dan link seperti `username.github.io/nama-repository`, repository ini sudah menyediakan workflow GitHub Pages. Mode Pages menjalankan frontend langsung di browser dan memakai Supabase sebagai backend data.
-
-1. Buka repository GitHub, masuk ke **Settings > Secrets and variables > Actions**.
-2. Tambahkan repository secrets `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY`.
-3. Masuk ke **Settings > Pages**, pilih source **GitHub Actions**.
-4. Jalankan workflow **Deploy GitHub Pages** dari tab **Actions**.
-5. Salin URL Pages yang diberikan GitHub, biasanya `https://ayugirsang.github.io/RENTAL-MUSIK/`.
-
-Workflow akan membuat `config.js` saat build tanpa menyimpan `.env` di repository. Setiap push ke branch `main` akan memicu deploy ulang.
-
-Untuk menjalankan Express sebagai server API, gunakan `render.yaml` dan deployment Render. Mode ini cocok untuk penggunaan lokal atau server Node.js.
-
-## Keamanan Supabase
-
-`schema.sql` saat ini berisi policy demo untuk aplikasi akademik tanpa login. Sebelum deployment publik, ganti policy tersebut dengan RLS berbasis autentikasi Supabase dan batasi akses setiap pengguna sesuai kebutuhan.
+Jangan pernah memasukkan `service_role` key atau file `.env` ke repository, frontend, maupun konfigurasi publik.
