@@ -210,27 +210,37 @@ URL demo proyek: <https://ayugirsang.github.io/RENTAL-MUSIK/>.
 ## Struktur repository
 
 ```text
-backend/
-  app.js                                API Express
-  schema.sql                            Tabel, relasi, indeks, dan RLS Supabase
-  triggers.sql                         Fungsi bisnis dan trigger database
-  seed.sql                              Data awal alat musik demo
-  migrations/                           Migrasi database Supabase
-frontend/
-  index.html                            Halaman utama aplikasi
-  css/
-    style.css                           Tampilan aplikasi
-  img/
-    logo.svg                            Logo aplikasi
-  js/
-    supabase.js                         Inisialisasi koneksi Supabase frontend
-    app.js                              Logika aplikasi
-    config.example.js                   Contoh konfigurasi Supabase frontend
-.github/workflows/                      Pemeriksaan dan deployment otomatis
-index.html                              Pengalih ke frontend/ untuk hosting root statis
-package.json, package-lock.json         Dependensi dan perintah proyek
-.env.example                            Contoh konfigurasi server lokal
+RENTAL-MUSIK/
+├── backend/
+│   ├── app.js                           API Express untuk mode server lokal
+│   ├── schema.sql                       Tabel, relasi, indeks, dan kebijakan RLS Supabase
+│   ├── triggers.sql                     Validasi rental, pengembalian, pembayaran, dan jurnal
+│   ├── seed.sql                         Data contoh alat musik
+│   └── migrations/                      Perubahan skema untuk database yang sudah ada
+│       ├── 20261008_add_more_instruments.sql
+│       └── 20261011_add_rental_payment_accounting.sql
+├── frontend/
+│   ├── index.html                       Halaman aplikasi rental musik
+│   ├── css/
+│   │   └── style.css                    Gaya dan tata letak aplikasi
+│   ├── img/
+│   │   └── logo.svg                     Logo Ritme
+│   └── js/
+│       ├── supabase.js                  Inisialisasi koneksi Supabase
+│       ├── app.js                       Dashboard, rental, inventaris, dan akuntansi
+│       └── config.example.js            Contoh konfigurasi Supabase frontend
+├── .github/
+│   └── workflows/                       Pemeriksaan otomatis dan deployment Pages
+├── index.html                           Pengalih root ke frontend/ untuk GitHub Pages
+├── .env.example                         Contoh konfigurasi Supabase untuk server lokal
+├── .gitignore                           Mengecualikan dependensi dan konfigurasi rahasia
+├── package.json                         Perintah dan dependensi Node.js
+├── package-lock.json                    Versi dependensi yang terkunci
+├── render.yaml                          Konfigurasi deployment server Render
+└── README.md                            Dokumentasi proyek
 ```
+
+**Catatan:** aplikasi frontend saat ini menggabungkan fitur dashboard, transaksi rental, inventaris, pembayaran, jurnal, buku besar, dan laporan di `frontend/js/app.js`. File fitur terpisah seperti `dashboard.js` atau `pembayaran.js` tidak dibuat karena aplikasi ini tidak menggunakan arsitektur multi-modul seperti contoh sistem padel.
 
 ## Batasan keamanan demo
 
