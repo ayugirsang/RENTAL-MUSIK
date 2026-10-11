@@ -2,8 +2,6 @@
 
 **Ritme** adalah aplikasi web untuk membantu penjual mengelola usaha rental alat musik. Aplikasi mencatat pelanggan, inventaris, transaksi penyewaan, pengembalian, pembayaran sewa dan denda, serta menyajikan jurnal umum, buku besar, dan laporan pendapatan.
 
-> Proyek ini dibuat sebagai aplikasi demo/tugas akademik. Data tersimpan di Supabase.
-
 ## Tautan proyek
 
 - **Repository GitHub:** [ayugirsang/RENTAL-MUSIK](https://github.com/ayugirsang/RENTAL-MUSIK)
