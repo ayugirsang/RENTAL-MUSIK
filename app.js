@@ -198,6 +198,38 @@ app.get('/api/pengembalian/belum-lunas', async (_req, res) => {
   })).filter(row => row.sisa_denda > 0));
 });
 
+app.get('/api/penyewaan/belum-lunas', async (_req, res) => {
+  const { data: rentals, error } = await supabase.from('penyewaan')
+    .select('id_sewa, id_pelanggan, tgl_sewa, total_biaya, status_pembayaran_sewa, basis_pencatatan')
+    .in('status_pembayaran_sewa', ['Belum Dicatat', 'Belum Lunas', 'Sebagian'])
+    .order('id_sewa', { ascending: false });
+  if (error) return sendDatabaseError(res, error, 500);
+  if (!rentals.length) return res.json([]);
+
+  const ids = rentals.map(row => row.id_sewa);
+  const customerIds = [...new Set(rentals.map(row => row.id_pelanggan))];
+  const [{ data: payments, error: paymentError }, { data: customers, error: customerError }] = await Promise.all([
+    supabase.from('pembayaran_sewa').select('id_sewa, jumlah_bayar').in('id_sewa', ids),
+    supabase.from('pelanggan').select('id_pelanggan, nama').in('id_pelanggan', customerIds)
+  ]);
+  if (paymentError || customerError) return sendDatabaseError(res, paymentError || customerError, 500);
+
+  const paidByRental = new Map();
+  for (const payment of payments) {
+    paidByRental.set(payment.id_sewa, (paidByRental.get(payment.id_sewa) || 0) + Number(payment.jumlah_bayar));
+  }
+  const customerById = new Map(customers.map(row => [row.id_pelanggan, row.nama]));
+  res.json(rentals.map(row => {
+    const total_terbayar = paidByRental.get(row.id_sewa) || 0;
+    return {
+      ...row,
+      nama_pelanggan: customerById.get(row.id_pelanggan) || 'Pelanggan',
+      total_terbayar,
+      sisa_tagihan: Math.max(0, Number(row.total_biaya) - total_terbayar)
+    };
+  }).filter(row => row.sisa_tagihan > 0));
+});
+
 app.post('/api/pembayaran-denda', async (req, res) => {
   const { id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar } = req.body;
   const amount = Number(jumlah_bayar);
@@ -212,17 +244,32 @@ app.post('/api/pembayaran-denda', async (req, res) => {
   res.status(201).json(data);
 });
 
+app.post('/api/pembayaran-sewa', async (req, res) => {
+  const { id_sewa, tgl_bayar, jumlah_bayar, metode_bayar } = req.body;
+  const amount = Number(jumlah_bayar);
+  if (!isPositiveInteger(id_sewa) || !isValidDate(tgl_bayar)
+    || !Number.isFinite(amount) || amount <= 0 || !['Tunai', 'Transfer', 'QRIS'].includes(metode_bayar)) {
+    return res.status(400).json({ error: 'Lengkapi tanggal, jumlah positif, dan metode pembayaran yang valid.' });
+  }
+  const { data, error } = await supabase.from('pembayaran_sewa')
+    .insert({ id_sewa, tgl_bayar, jumlah_bayar: amount, metode_bayar })
+    .select('id_pembayaran_sewa, id_sewa, tgl_bayar, jumlah_bayar, metode_bayar').single();
+  if (error) return sendDatabaseError(res, error);
+  res.status(201).json(data);
+});
+
 app.get('/api/detail', async (_req, res) => {
-  const [customers, equipment, rentals, rentalDetails, returns, payments] = await Promise.all([
+  const [customers, equipment, rentals, rentalDetails, returns, payments, rentalPayments] = await Promise.all([
     getAllRows('pelanggan', 'id_pelanggan, nama, no_hp, alamat', 'id_pelanggan'),
     getAllRows('alat_musik', 'id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status', 'id_alat'),
-    getAllRows('penyewaan', 'id_sewa, id_pelanggan, tgl_sewa, tgl_rencana_kembali, total_biaya, status_sewa', 'id_sewa'),
+    getAllRows('penyewaan', 'id_sewa, id_pelanggan, tgl_sewa, tgl_rencana_kembali, total_biaya, status_sewa, status_pembayaran_sewa, basis_pencatatan', 'id_sewa'),
     getAllRows('detail_penyewaan', 'id_detail, id_sewa, id_alat, jumlah, subtotal', 'id_detail'),
     getAllRows('pengembalian', 'id_pengembalian, id_sewa, tgl_kembali_aktual, hari_terlambat, total_denda, status_pembayaran_denda', 'id_pengembalian'),
-    getAllRows('pembayaran_denda', 'id_pembayaran, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran')
+    getAllRows('pembayaran_denda', 'id_pembayaran, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran'),
+    getAllRows('pembayaran_sewa', 'id_pembayaran_sewa, id_sewa, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran_sewa')
   ]);
   const error = customers.error || equipment.error || rentals.error
-    || rentalDetails.error || returns.error || payments.error;
+    || rentalDetails.error || returns.error || payments.error || rentalPayments.error;
   if (error) return sendDatabaseError(res, error, 500);
   res.json({
     customers: customers.data,
@@ -230,14 +277,17 @@ app.get('/api/detail', async (_req, res) => {
     rentals: rentals.data,
     rentalDetails: rentalDetails.data,
     returns: returns.data,
-    payments: payments.data
+    payments: payments.data,
+    rentalPayments: rentalPayments.data
   });
 });
 
 app.get('/api/jurnal', async (_req, res) => {
-  const { data, error } = await supabase.from('jurnal_akuntansi')
-    .select('id_jurnal, id_pengembalian, tgl_jurnal, kode_akun, nama_akun, debit, kredit, keterangan')
-    .order('tgl_jurnal', { ascending: false }).order('id_jurnal', { ascending: false }).limit(500);
+  const { data, error } = await getAllRows(
+    'jurnal_akuntansi',
+    'id_jurnal, id_pengembalian, id_sewa, id_pembayaran_sewa, tgl_jurnal, kode_akun, nama_akun, debit, kredit, keterangan',
+    'id_jurnal'
+  );
   if (error) return sendDatabaseError(res, error, 500);
   res.json(data);
 });
