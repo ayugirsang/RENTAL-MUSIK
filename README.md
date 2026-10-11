@@ -241,7 +241,7 @@ RENTAL-MUSIK/
 
 **Catatan:** aplikasi frontend saat ini menggabungkan fitur dashboard, transaksi rental, inventaris, pembayaran, jurnal, buku besar, dan laporan di `frontend/js/app.js`. File fitur terpisah seperti `dashboard.js` atau `pembayaran.js` tidak dibuat karena aplikasi ini tidak menggunakan arsitektur multi-modul seperti contoh sistem padel.
 
-Foto instrumen diambil dari [Unsplash](https://unsplash.com/license) dan disimpan lokal di `frontend/img/instruments/` agar demo tidak perlu memuat gambar dari layanan eksternal.
+Foto instrumen disimpan lokal di `frontend/img/instruments/` agar demo tidak perlu memuat gambar dari layanan eksternal. Foto selain cajon berasal dari [Unsplash](https://unsplash.com/license); foto cajon menggunakan gambar yang diberikan pengguna.
 
 ## Batasan keamanan demo
 

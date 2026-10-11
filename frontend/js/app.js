@@ -486,7 +486,8 @@ function instrumentArtwork(name) {
 
 function instrumentPhoto(name) {
   if (/keyboard|piano|organ/.test(name)) return 'keyboard.jpg';
-  if (/cajon|conga|bongo|perkusi/.test(name)) return 'percussion.jpg';
+  if (/cajon/.test(name)) return 'cajon.png';
+  if (/conga|bongo|perkusi/.test(name)) return 'percussion.jpg';
   if (/drum/.test(name)) return 'drums.jpg';
   if (/mikrofon|microphone/.test(name)) return 'microphone.jpg';
   if (/sax|saksofon|klarinet|clarinet/.test(name)) return 'saxophone.jpg';
@@ -494,7 +495,10 @@ function instrumentPhoto(name) {
   if (/flute|seruling|suling/.test(name)) return 'flute.jpg';
   if (/biola|violin|cello|selo/.test(name)) return 'violin.jpg';
   if (/ampli|speaker|pengeras suara/.test(name)) return 'amplifier.jpg';
-  if (/gitar|guitar|bass|ukulele|uke/.test(name)) return 'guitar.jpg';
+  if (/ukulele|uke/.test(name)) return 'ukulele.jpg';
+  if (/gitar akustik|guitar acoustic|acoustic guitar/.test(name)) return 'acoustic-guitar.jpg';
+  if (/gitar elektrik|gitar listrik|guitar electric|electric guitar|bass/.test(name)) return 'electric-guitar.jpg';
+  if (/gitar|guitar/.test(name)) return 'acoustic-guitar.jpg';
   return null;
 }
 
