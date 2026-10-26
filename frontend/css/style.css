@@ -600,6 +600,15 @@ input:focus, select:focus { box-shadow: 0 0 0 3px #2864e81a; }
 .equipment-name { color: #243148; font-size: 12px; }
 .equipment-name small { color: #7c899d; font-size: 10px; }
 .equipment-option strong { color: #2457bd; font-size: 10px; }
+.record-edit-button { padding: 6px 10px; border: 1px solid #d7e0ec; border-radius: 7px; background: #fff; color: #2457bd; cursor: pointer; font-size: 11px; font-weight: 700; }
+.record-edit-button:hover { border-color: #a9c1f1; background: #edf3ff; }
+.record-editor { width: min(500px, calc(100% - 28px)); max-height: min(85vh, 720px); padding: 24px; overflow-y: auto; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); box-shadow: 0 24px 80px #172b4d30; }
+.record-editor::backdrop { background: #101a2b70; backdrop-filter: blur(3px); }
+.record-editor .panel-heading { margin-bottom: 22px; }
+.record-editor-close { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: #fff; color: var(--muted); cursor: pointer; font-size: 22px; }
+.record-editor-fields { display: grid; gap: 10px; }
+.record-editor-fields input[readonly] { background: #f2f4f8; color: var(--muted); cursor: not-allowed; }
+.record-editor-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 24px; }
 
 @media (max-width: 820px) {
   .instrument-hero { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 17px; padding: 20px; }

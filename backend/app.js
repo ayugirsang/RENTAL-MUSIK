@@ -115,6 +115,23 @@ app.post('/api/pelanggan', async (req, res) => {
   res.status(201).json(data);
 });
 
+app.patch('/api/pelanggan/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  const body = req.body || {};
+  const nama = typeof body.nama === 'string' ? body.nama.trim() : '';
+  const no_hp = typeof body.no_hp === 'string' ? body.no_hp.trim() : '';
+  const alamat = typeof body.alamat === 'string' ? body.alamat.trim() : '';
+  if (!isPositiveInteger(id) || !nama || !no_hp) {
+    return res.status(400).json({ error: 'ID, nama, dan nomor HP pelanggan wajib valid.' });
+  }
+  const { data, error } = await supabase.from('pelanggan')
+    .update({ nama, no_hp, alamat })
+    .eq('id_pelanggan', id).select('id_pelanggan, nama, no_hp, alamat').single();
+  if (error?.code === 'PGRST116') return res.status(404).json({ error: 'Pelanggan tidak ditemukan.' });
+  if (error) return sendDatabaseError(res, error);
+  res.json(data);
+});
+
 app.get('/api/alat-musik', async (_req, res) => {
   const { data, error } = await supabase.from('alat_musik')
     .select('id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status').order('nama_alat');
@@ -138,6 +155,40 @@ app.post('/api/alat-musik', async (req, res) => {
     .select('id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status').single();
   if (error) return sendDatabaseError(res, error);
   res.status(201).json(data);
+});
+
+app.patch('/api/alat-musik/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  const body = req.body || {};
+  const nama = typeof body.nama_alat === 'string' ? body.nama_alat.trim() : '';
+  const rawHarga = body.harga_sewa_per_hari;
+  const rawDenda = body.denda_per_hari;
+  const harga = typeof rawHarga === 'number' || (typeof rawHarga === 'string' && rawHarga.trim()) ? Number(rawHarga) : NaN;
+  const denda = typeof rawDenda === 'number' || (typeof rawDenda === 'string' && rawDenda.trim()) ? Number(rawDenda) : NaN;
+  if (!isPositiveInteger(id)) return res.status(400).json({ error: 'ID alat musik tidak valid.' });
+  if (!nama || nama.length > 100) return res.status(400).json({ error: 'Nama alat wajib diisi (maksimal 100 karakter).' });
+  if (!Number.isFinite(harga) || harga < 0 || !Number.isFinite(denda) || denda < 0) {
+    return res.status(400).json({ error: 'Harga sewa dan denda harus berupa angka nol atau lebih.' });
+  }
+
+  const { data: current, error: lookupError } = await supabase.from('alat_musik')
+    .select('status, harga_sewa_per_hari, denda_per_hari').eq('id_alat', id).single();
+  if (lookupError?.code === 'PGRST116') return res.status(404).json({ error: 'Alat musik tidak ditemukan.' });
+  if (lookupError) return sendDatabaseError(res, lookupError, 500);
+  if (current.status === 'Disewa'
+    && (harga !== Number(current.harga_sewa_per_hari) || denda !== Number(current.denda_per_hari))) {
+    return res.status(409).json({ error: 'Tarif alat tidak dapat diubah selama alat sedang disewa.' });
+  }
+
+  const { data, error } = await supabase.from('alat_musik')
+    .update({ nama_alat: nama, harga_sewa_per_hari: harga, denda_per_hari: denda })
+    .eq('id_alat', id).eq('status', current.status)
+    .select('id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status').single();
+  if (error?.code === 'PGRST116') {
+    return res.status(409).json({ error: 'Status alat berubah. Muat ulang data sebelum mengubah inventaris.' });
+  }
+  if (error) return sendDatabaseError(res, error);
+  res.json(data);
 });
 
 app.get('/api/penyewaan/aktif', async (_req, res) => {

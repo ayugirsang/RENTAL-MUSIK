@@ -80,10 +80,31 @@ async function supabaseApi(url, options = {}) {
       alatTersedia: equipment.data?.filter(row => row.status === 'Tersedia').length,
       alatDisewa: equipment.data?.filter(row => row.status === 'Disewa').length
     }, error: payments.error || rentals.error || equipment.error };
+  } else if (url.startsWith('/api/pelanggan/') && options.method === 'PATCH') {
+    const id = Number(url.split('/').pop());
+    result = await supabaseClient.from('pelanggan').update(body)
+      .eq('id_pelanggan', id).select('id_pelanggan, nama, no_hp, alamat').single();
   } else if (url === '/api/pelanggan' && options.method === 'POST') {
     result = await supabaseClient.from('pelanggan').insert(body).select('id_pelanggan, nama, no_hp, alamat').single();
   } else if (url === '/api/pelanggan') {
     result = await supabaseClient.from('pelanggan').select('id_pelanggan, nama, no_hp, alamat').order('nama');
+  } else if (url.startsWith('/api/alat-musik/') && options.method === 'PATCH') {
+    const id = Number(url.split('/').pop());
+    const current = await supabaseClient.from('alat_musik')
+      .select('status, harga_sewa_per_hari, denda_per_hari').eq('id_alat', id).single();
+    if (current.error) result = current;
+    else if (current.data.status === 'Disewa'
+      && (Number(body.harga_sewa_per_hari) !== Number(current.data.harga_sewa_per_hari)
+        || Number(body.denda_per_hari) !== Number(current.data.denda_per_hari))) {
+      throw new Error('Tarif alat tidak dapat diubah selama alat sedang disewa.');
+    } else {
+      result = await supabaseClient.from('alat_musik').update(body)
+        .eq('id_alat', id).eq('status', current.data.status)
+        .select('id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status').single();
+      if (result.error?.code === 'PGRST116') {
+        throw new Error('Status alat berubah. Muat ulang data sebelum mengubah inventaris.');
+      }
+    }
   } else if (url === '/api/alat-musik' && options.method === 'POST') {
     result = await supabaseClient.from('alat_musik')
       .insert(body).select('id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status').single();
@@ -689,10 +710,11 @@ function renderDetailData() {
   const previousCustomer = selectCustomer.value;
   const { customers, rentals, returns } = detailLookups();
   const customerRows = [...data.customers].sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
-  document.querySelector('#customer-list').innerHTML = `<table><thead><tr><th>NAMA PELANGGAN</th><th>NOMOR HP</th><th>ALAMAT</th><th class="amount-cell">JUMLAH RENTAL</th></tr></thead><tbody>${customerRows.map(customer => {
+  document.querySelector('#customer-list').innerHTML = `<table><thead><tr><th>NAMA PELANGGAN</th><th>NOMOR HP</th><th>ALAMAT</th><th class="amount-cell">JUMLAH RENTAL</th><th>AKSI</th></tr></thead><tbody>${customerRows.map(customer => {
     const rentalCount = data.rentals.filter(rental => rental.id_pelanggan === customer.id_pelanggan).length;
-    return `<tr><td><strong>${escapeHtml(customer.nama)}</strong></td><td>${escapeHtml(customer.no_hp)}</td><td>${escapeHtml(customer.alamat || '—')}</td><td class="amount-cell">${rentalCount}</td></tr>`;
-  }).join('') || '<tr><td colspan="4" class="empty-cell">Belum ada pelanggan.</td></tr>'}</tbody></table>`;
+    return `<tr><td><strong>${escapeHtml(customer.nama)}</strong></td><td>${escapeHtml(customer.no_hp)}</td><td>${escapeHtml(customer.alamat || '—')}</td><td class="amount-cell">${rentalCount}</td>
+      <td><button class="record-edit-button" type="button" data-edit-record="customer" data-record-id="${customer.id_pelanggan}">Ubah</button></td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty-cell">Belum ada pelanggan.</td></tr>'}</tbody></table>`;
   const returnRows = [...data.returns].sort((a, b) => b.id_pengembalian - a.id_pengembalian);
   selectReturn.innerHTML = '<option value="">Pilih tagihan denda</option>' + returnRows.map(row => {
     const rental = rentals.get(row.id_sewa);
@@ -831,10 +853,86 @@ function renderEquipmentReport() {
     return `<tr><td><strong>${escapeHtml(item.nama_alat)}</strong><small>${currency.format(Number(item.harga_sewa_per_hari))} / hari</small></td>
       <td><span class="status-pill ${item.status === 'Disewa' ? 'status-late' : 'status-active'}">${escapeHtml(item.status)}</span></td>
       <td>${rentalCount}</td><td class="amount-cell">${currency.format(rentalIncome)}</td>
-      <td class="amount-cell">${currency.format(fines)}</td><td class="amount-cell">${currency.format(paid)}</td></tr>`;
+      <td class="amount-cell">${currency.format(fines)}</td><td class="amount-cell">${currency.format(paid)}</td>
+      <td><button class="record-edit-button" type="button" data-edit-record="equipment" data-record-id="${item.id_alat}">Ubah</button></td></tr>`;
   }).join('');
-  document.querySelector('#equipment-report').innerHTML = `<table><thead><tr><th>ALAT</th><th>STATUS</th><th>JUMLAH SEWA</th><th class="amount-cell">PENDAPATAN SEWA</th><th class="amount-cell">DENDA TERCATAT</th><th class="amount-cell">DENDA DITERIMA</th></tr></thead>
-    <tbody>${dataRows || '<tr><td colspan="6" class="empty-cell">Belum ada data inventaris.</td></tr>'}</tbody></table>`;
+  document.querySelector('#equipment-report').innerHTML = `<table><thead><tr><th>ALAT</th><th>STATUS</th><th>JUMLAH SEWA</th><th class="amount-cell">PENDAPATAN SEWA</th><th class="amount-cell">DENDA TERCATAT</th><th class="amount-cell">DENDA DITERIMA</th><th>AKSI</th></tr></thead>
+    <tbody>${dataRows || '<tr><td colspan="7" class="empty-cell">Belum ada data inventaris.</td></tr>'}</tbody></table>`;
+}
+
+function openRecordEditor(type, id) {
+  const customer = type === 'customer' && state.detail?.customers.find(item => item.id_pelanggan === id);
+  const equipment = type === 'equipment' && state.detail?.equipment.find(item => item.id_alat === id);
+  const record = customer || equipment;
+  if (!record) return notify('Data yang akan diubah tidak ditemukan. Muat ulang data dan coba lagi.', true);
+
+  const isCustomer = type === 'customer';
+  const lockedRates = !isCustomer && equipment.status === 'Disewa';
+  const dialog = document.querySelector('#record-editor');
+  const form = document.querySelector('#record-editor-form');
+  const fields = document.querySelector('#record-editor-fields');
+  dialog.dataset.recordType = type;
+  dialog.dataset.recordId = String(id);
+  document.querySelector('#record-editor-title').textContent = isCustomer ? 'Ubah data pelanggan' : 'Ubah data inventaris';
+  fields.innerHTML = isCustomer
+    ? `<label class="field-label" for="edit-customer-name">Nama pelanggan <span class="required">*</span></label>
+       <input id="edit-customer-name" name="nama" type="text" required value="${escapeHtml(customer.nama)}">
+       <label class="field-label" for="edit-customer-phone">Nomor HP <span class="required">*</span></label>
+       <input id="edit-customer-phone" name="no_hp" type="tel" required value="${escapeHtml(customer.no_hp)}">
+       <label class="field-label" for="edit-customer-address">Alamat</label>
+       <input id="edit-customer-address" name="alamat" type="text" value="${escapeHtml(customer.alamat || '')}">`
+    : `<label class="field-label" for="edit-equipment-name">Nama alat musik <span class="required">*</span></label>
+       <input id="edit-equipment-name" name="nama_alat" type="text" maxlength="100" required value="${escapeHtml(equipment.nama_alat)}">
+       <div class="field-pair">
+         <div><label class="field-label" for="edit-equipment-rate">Tarif sewa / hari (Rp) <span class="required">*</span></label>
+           <input id="edit-equipment-rate" name="harga_sewa_per_hari" type="number" min="0" step="1" required ${lockedRates ? 'readonly' : ''} value="${Number(equipment.harga_sewa_per_hari)}"></div>
+         <div><label class="field-label" for="edit-equipment-fine">Denda / hari (Rp) <span class="required">*</span></label>
+           <input id="edit-equipment-fine" name="denda_per_hari" type="number" min="0" step="1" required ${lockedRates ? 'readonly' : ''} value="${Number(equipment.denda_per_hari)}"></div>
+       </div>
+       ${lockedRates ? '<small class="field-hint">Tarif dikunci selama alat sedang disewa agar perhitungan transaksi berjalan tetap konsisten.</small>' : ''}`;
+  dialog.showModal();
+  fields.querySelector('input:not([readonly])')?.focus();
+}
+
+async function saveRecordEdit(event) {
+  event.preventDefault();
+  const dialog = document.querySelector('#record-editor');
+  const form = event.currentTarget;
+  if (!form.reportValidity()) return;
+
+  const type = dialog.dataset.recordType;
+  const id = Number(dialog.dataset.recordId);
+  const payload = Object.fromEntries(new FormData(form));
+  if (type === 'customer') {
+    payload.nama = String(payload.nama).trim();
+    payload.no_hp = String(payload.no_hp).trim();
+    payload.alamat = String(payload.alamat).trim();
+    if (!payload.nama || !payload.no_hp) return notify('Nama dan nomor HP wajib diisi.', true);
+  } else {
+    payload.nama_alat = String(payload.nama_alat).trim();
+    payload.harga_sewa_per_hari = Number(payload.harga_sewa_per_hari);
+    payload.denda_per_hari = Number(payload.denda_per_hari);
+    if (!payload.nama_alat || !Number.isFinite(payload.harga_sewa_per_hari) || payload.harga_sewa_per_hari < 0
+      || !Number.isFinite(payload.denda_per_hari) || payload.denda_per_hari < 0) {
+      return notify('Nama alat wajib diisi dan tarif harus berupa angka nol atau lebih.', true);
+    }
+  }
+
+  const button = form.querySelector('[type="submit"]');
+  button.disabled = true;
+  try {
+    await api(`/api/${type === 'customer' ? 'pelanggan' : 'alat-musik'}/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+    await Promise.all([loadCustomers(), loadEquipment(), loadDetailData()]);
+    dialog.close();
+    notify(type === 'customer' ? 'Data pelanggan berhasil diperbarui.' : 'Data inventaris berhasil diperbarui.');
+  } catch (error) {
+    notify(`Perubahan gagal disimpan: ${error.message}`, true);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function getFilteredReturns() {
@@ -1221,6 +1319,15 @@ function initialize() {
     fillRentPaymentAmount(button.dataset.rentPaymentAmount);
   }));
   document.querySelector('#download-csv').addEventListener('click', exportJournals);
+  document.querySelector('#record-editor-form').addEventListener('submit', saveRecordEdit);
+  document.querySelector('#record-editor-cancel').addEventListener('click', () => document.querySelector('#record-editor').close());
+  document.querySelector('#record-editor-close').addEventListener('click', () => document.querySelector('#record-editor').close());
+  document.querySelectorAll('#customer-list, #equipment-report').forEach(container => {
+    container.addEventListener('click', event => {
+      const button = event.target.closest('[data-edit-record]');
+      if (button) openRecordEditor(button.dataset.editRecord, Number(button.dataset.recordId));
+    });
+  });
 
   document.querySelector('#toggle-customer-form').addEventListener('click', () => {
     const form = document.querySelector('#customer-create');

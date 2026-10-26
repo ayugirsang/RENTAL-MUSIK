@@ -6,6 +6,7 @@
 
 - **Repository GitHub:** [ayugirsang/RENTAL-MUSIK](https://github.com/ayugirsang/RENTAL-MUSIK)
 - **Aplikasi demo:** [ayugirsang.github.io/RENTAL-MUSIK](https://ayugirsang.github.io/RENTAL-MUSIK/)
+- **Analisis kelayakan dan SDLC:** [docs/analisis-kelayakan-sdlc.md](./docs/analisis-kelayakan-sdlc.md)
 
 Repository berisi kode sumber, skema database, panduan, dan konfigurasi deployment. Tautan demo digunakan untuk mencoba aplikasinya.
 
@@ -14,8 +15,8 @@ Repository berisi kode sumber, skema database, panduan, dan konfigurasi deployme
 | Menu/fitur | Penjelasan |
 | --- | --- |
 | **Dashboard** | Menampilkan pendapatan dan kas diterima bulan ini, piutang terakru, penyewaan aktif, alat tersedia, jadwal jatuh tempo, keterlambatan, tren pendapatan harian, serta tindak lanjut operasional. |
-| **Pelanggan** | Menambahkan dan memilih pelanggan untuk transaksi rental. |
-| **Inventaris alat musik** | Menyediakan contoh gitar, bass, keyboard, drum, mikrofon, biola, ukulele, cajon, saksofon, trompet, seruling, ampli, dan speaker. Penjual dapat menambahkan alat beserta tarif sewa dan denda per hari. Pilihan alat dilengkapi foto alat musik. |
+| **Pelanggan** | Menambahkan, memperbarui, dan memilih data pelanggan untuk transaksi rental. |
+| **Inventaris alat musik** | Menyediakan contoh gitar, bass, keyboard, drum, mikrofon, biola, ukulele, cajon, saksofon, trompet, seruling, ampli, dan speaker. Penjual dapat menambahkan alat beserta tarif sewa dan denda per hari, lalu memperbarui data inventaris. Tarif unit dikunci selama sedang disewa agar transaksi berjalan tidak berubah. Pilihan alat dilengkapi foto alat musik. |
 | **Penyewaan** | Membuat penyewaan dari alat yang tersedia. Biaya dihitung dari tarif harian dan lama penyewaan. Alat yang dipilih berubah menjadi berstatus disewa. |
 | **Pengembalian** | Mencatat tanggal kembali, menghitung keterlambatan dan denda secara otomatis, menyelesaikan penyewaan, dan mengembalikan status alat menjadi tersedia. |
 | **Pembayaran sewa** | Mencatat penerimaan tunai, transfer, atau QRIS. Pembayaran dapat dicicil; sistem menghitung sisa tagihan dan mencegah pembayaran melebihi saldo. |

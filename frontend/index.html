@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=instrument-gallery-1">
-  <script src="js/app.js?v=instrument-gallery-1" defer></script>
+  <link rel="stylesheet" href="css/style.css?v=master-data-edit-1">
+  <script src="js/app.js?v=master-data-edit-1" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase.js"></script>
@@ -162,7 +162,7 @@
       </section>
 
       <section class="view" id="view-details" aria-labelledby="details-title">
-        <div class="page-heading"><div><div class="eyebrow">DATA USAHA</div><h1 id="details-title">Pelanggan & inventaris</h1><p>Telusuri riwayat pelanggan, pembayaran, inventaris, dan performa usaha.</p></div><button class="button button-outline" id="download-detail-csv" type="button"><span aria-hidden="true">↓</span> Unduh laporan CSV</button></div>
+        <div class="page-heading"><div><div class="eyebrow">DATA USAHA</div><h1 id="details-title">Pelanggan & inventaris</h1><p>Kelola data pelanggan dan inventaris, telusuri riwayat pembayaran, serta pantau performa usaha.</p></div><button class="button button-outline" id="download-detail-csv" type="button"><span aria-hidden="true">↓</span> Unduh laporan CSV</button></div>
         <section class="panel detail-panel">
           <div class="detail-section">
             <div class="panel-heading"><div><div class="eyebrow">PELANGGAN</div><h2>Daftar pelanggan</h2></div></div>
@@ -240,6 +240,18 @@
           <div id="income-report" class="table-wrap"></div>
         </section>
       </section>
+      <dialog class="record-editor" id="record-editor" aria-labelledby="record-editor-title">
+        <form id="record-editor-form">
+          <div class="panel-heading"><div><div class="eyebrow">DATA USAHA</div><h2 id="record-editor-title">Ubah data</h2></div>
+            <button class="record-editor-close" id="record-editor-close" type="button" aria-label="Tutup">×</button>
+          </div>
+          <div class="record-editor-fields" id="record-editor-fields"></div>
+          <div class="record-editor-actions">
+            <button class="button button-outline" id="record-editor-cancel" type="button">Batal</button>
+            <button class="button button-dark" type="submit">Simpan perubahan</button>
+          </div>
+        </form>
+      </dialog>
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
     </main>
   </div>
