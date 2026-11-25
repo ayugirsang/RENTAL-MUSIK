@@ -273,7 +273,9 @@ async function loadDashboard() {
 
 function renderDueTable() {
   const today = localDateValue();
-  const datedRentals = state.rentals.map(rental => ({ rental, days: daysUntil(rental.tgl_rencana_kembali, today) }));
+  const datedRentals = state.rentals
+    .map(rental => ({ rental, days: daysUntil(rental.tgl_rencana_kembali, today) }))
+    .sort((a, b) => a.days - b.days || a.rental.id_sewa - b.rental.id_sewa);
   document.querySelector('#count-rentals').textContent = datedRentals.length;
   document.querySelector('#count-due-soon').textContent = datedRentals.filter(({ days }) => days >= 0 && days <= 3).length;
   document.querySelector('#count-late').textContent = datedRentals.filter(({ days }) => days < 0).length;
@@ -284,19 +286,21 @@ function renderDueTable() {
   });
   const rows = filtered.slice(0, 8).map(({ rental, days }) => {
     const status = days < 0
-      ? { className: 'status-late', label: `Terlambat ${Math.abs(days)} hari` }
+      ? { className: 'status-late', rowClass: 'is-overdue', label: `Terlambat ${Math.abs(days)} hari` }
       : days === 0
-        ? { className: 'status-due', label: 'Jatuh tempo hari ini' }
+        ? { className: 'status-today', rowClass: 'is-due-today', label: 'Jatuh tempo hari ini' }
         : days <= 3
-          ? { className: 'status-due', label: `Dalam ${days} hari` }
-          : { className: 'status-active', label: 'Berlangsung' };
-    return `<tr><td><strong>${escapeHtml(rental.pelanggan?.nama || 'Pelanggan')}</strong><small>Sewa #${rental.id_sewa}</small></td><td>${formatDate(rental.tgl_rencana_kembali)}</td><td>${currency.format(Number(rental.total_biaya))}</td><td><span class="status-pill ${status.className}"><i></i>${status.label}</span></td></tr>`;
+          ? { className: 'status-due', rowClass: 'is-due-soon', label: `Dalam ${days} hari` }
+          : { className: 'status-active', rowClass: '', label: 'Berlangsung' };
+    return `<tr class="${status.rowClass}"><td><strong>${escapeHtml(rental.pelanggan?.nama || 'Pelanggan')}</strong><small>Sewa #${rental.id_sewa}</small></td><td>${formatDate(rental.tgl_rencana_kembali)}</td><td>${currency.format(Number(rental.total_biaya))}</td><td><span class="status-pill ${status.className}"><i></i>${status.label}</span></td></tr>`;
   }).join('');
   const emptyMessage = state.rentalFilter === 'all' ? 'Belum ada penyewaan aktif.' : 'Tidak ada pengembalian pada filter ini.';
   document.querySelector('#due-table').innerHTML = rows || `<tr><td colspan="4" class="empty-cell">${emptyMessage}</td></tr>`;
   document.querySelector('#due-caption').textContent = filtered.length > 8
-    ? `Menampilkan 8 dari ${filtered.length} penyewaan. Kelola daftar lengkap melalui menu Transaksi.`
-    : 'Pengingat jatuh tempo mencakup hari ini hingga 3 hari ke depan.';
+    ? `Menampilkan 8 dari ${filtered.length} rental, diurutkan berdasarkan tanggal terdekat. Kelola daftar lengkap melalui menu Transaksi.`
+    : state.rentalFilter === 'all'
+      ? 'Jadwal terdekat ditampilkan lebih dahulu. Pengingat mencakup hari ini hingga 3 hari ke depan.'
+      : 'Jadwal terdekat ditampilkan lebih dahulu.';
 }
 
 function renderSellerFollowup() {

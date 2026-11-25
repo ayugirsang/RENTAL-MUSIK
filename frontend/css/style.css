@@ -360,6 +360,11 @@ body { background: radial-gradient(ellipse at 85% 0, #eaf1ff 0, var(--canvas) 42
 .dashboard-filter.is-active > span { background: #dce8ff; color: #2457bd; }
 .due-caption { padding: 9px 8px 2px; color: #8591a3; font-size: 10px; line-height: 1.5; }
 .status-due { background: #fff3d9; color: #94620e; }
+.status-today { background: #fae8e9; color: #b54d53; }
+.due-panel tr.is-overdue td { background: #fff8f7; }
+.due-panel tr.is-overdue td:first-child { box-shadow: inset 3px 0 #d95f63; }
+.due-panel tr.is-due-today td:first-child { box-shadow: inset 3px 0 #d99a2b; }
+.due-panel tr.is-due-soon td:first-child { box-shadow: inset 3px 0 #e7c151; }
 .view#view-dashboard .note-panel { min-height: 100%; padding: 21px 19px; }
 .view#view-dashboard .note-mark { margin-bottom: 14px; background: #1c2b43; color: #83adff; }
 .view#view-dashboard .note-panel .eyebrow { color: #94afd9; }
