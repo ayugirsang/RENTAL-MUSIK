@@ -168,15 +168,17 @@ Di GitHub Pages, frontend mengakses Supabase langsung menggunakan publishable ke
    npm install
    ```
 
-3. Buat file `.env` berdasarkan `.env.example`, lalu isi konfigurasi Supabase:
+3. Buat file `.env` berdasarkan `.env.example`, lalu isi konfigurasi Supabase. Service-role key hanya untuk server lokal dan tidak boleh dipublikasikan:
 
    ```env
    SUPABASE_URL=https://YOUR_PROJECT.supabase.co
    SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+   SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
+   API_ALLOWED_ORIGIN=http://localhost:3000
    PORT=3000
    ```
 
-4. Untuk database baru, jalankan berurutan [`backend/schema.sql`](./backend/schema.sql), [`backend/triggers.sql`](./backend/triggers.sql), lalu [`backend/seed.sql`](./backend/seed.sql) melalui Supabase SQL Editor. File-file itu menyiapkan tabel dan RLS, fungsi bisnis serta trigger, lalu data awal alat musik.
+4. Untuk database baru, jalankan berurutan [`backend/schema.sql`](./backend/schema.sql), [`backend/triggers.sql`](./backend/triggers.sql), lalu [`backend/seed.sql`](./backend/seed.sql) melalui Supabase SQL Editor. File-file itu menyiapkan tabel dan RLS admin, fungsi bisnis serta trigger, lalu data awal alat musik.
 
 5. Jalankan server dari root repository dan buka [http://localhost:3000](http://localhost:3000):
 
@@ -196,15 +198,27 @@ node --check frontend\js\app.js
 git diff --check
 ```
 
+## Keamanan dan akun admin
+
+Database hanya mengizinkan akun yang tercatat di `public.ritme_admins`. Untuk proyek baru, atau database lama yang masih memakai policy demo:
+
+1. Buat backup database, lalu jalankan [`backend/migrations/20261125_admin_auth_and_rls.sql`](./backend/migrations/20261125_admin_auth_and_rls.sql) sekali di Supabase SQL Editor setelah schema dan fungsi bisnis tersedia. Migration ini mencabut akses `anon` dan mewajibkan admin terautentikasi.
+2. Di Supabase Authentication, matikan pendaftaran pengguna publik dan buat akun pemilik/admin secara manual.
+3. Salin UUID akun dari daftar Authentication → Users, lalu daftarkan sebagai admin melalui SQL Editor:
+
+   ```sql
+   insert into public.ritme_admins (user_id)
+   values ('UUID-AKUN-ADMIN');
+   ```
+
+4. Tambahkan repository secrets `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY` melalui **Settings → Secrets and variables → Actions**.
+5. Pastikan GitHub Pages menggunakan source **GitHub Actions** di **Settings → Pages**, lalu push ke branch `main`.
+
+Jangan pernah menaruh service-role key di frontend, GitHub Pages secrets yang dirender ke artefak, atau repository. Akun yang tidak ada di `ritme_admins` tidak dapat membaca atau mengubah tabel aplikasi walaupun berhasil mendaftar/login.
+
 ## Deployment GitHub Pages
 
-Repository ini memiliki workflow **Deploy GitHub Pages**. Untuk menyiapkan deployment:
-
-1. Tambahkan repository secrets `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY` melalui **Settings → Secrets and variables → Actions**.
-2. Pastikan GitHub Pages menggunakan source **GitHub Actions** di **Settings → Pages**.
-3. Push perubahan ke branch `main`; workflow akan membangun konfigurasi frontend dan menerbitkan situs.
-
-Deployment GitHub Pages saat ini mengakses Supabase langsung menggunakan publishable key. Jangan jalankan migration `backend/migrations/20261125_server_only_hardening.sql` pada konfigurasi ini karena migration tersebut menutup akses database langsung yang dibutuhkan frontend. Aplikasi belum memakai autentikasi pengguna; aktifkan autentikasi dan kebijakan RLS yang membatasi akses sebelum memakai data sensitif secara publik.
+Repository ini memiliki workflow **Deploy GitHub Pages**. Setelah Supabase Auth, migration keamanan, akun admin, dan dua repository secrets disiapkan, push ke branch `main`; workflow akan membangun konfigurasi frontend dan menerbitkan situs.
 
 URL demo proyek: <https://ayugirsang.github.io/RENTAL-MUSIK/>.
 

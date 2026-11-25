@@ -73,7 +73,8 @@ begin
 end;
 $$;
 
-grant execute on function public.buat_penyewaan(bigint, date, date, jsonb) to anon, authenticated;
+revoke all on function public.buat_penyewaan(bigint, date, date, jsonb) from public, anon, authenticated;
+grant execute on function public.buat_penyewaan(bigint, date, date, jsonb) to authenticated, service_role;
 
 -- Saat barang dikembalikan, hitung denda dari detail alat dan akrual jurnal.
 create or replace function public.proses_pengembalian()

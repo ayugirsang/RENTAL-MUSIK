@@ -18,6 +18,9 @@ const port = process.env.PORT || 3000;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false }
 });
+const authClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false }
+});
 
 app.disable('x-powered-by');
 app.use(express.json({ limit: '64kb' }));
@@ -28,7 +31,7 @@ app.use((req, res, next) => {
   if (API_ALLOWED_ORIGIN) {
     res.setHeader('Access-Control-Allow-Origin', API_ALLOWED_ORIGIN);
     res.setHeader('Vary', 'Origin');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Idempotency-Key');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Idempotency-Key');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
   }
   if (req.method === 'OPTIONS') return res.sendStatus(204);
@@ -46,33 +49,6 @@ app.get('/js/config.js', (_req, res) => {
   })};\n`);
 });
 
-const idempotencyCache = new Map();
-const IDENTITY_CACHE_MAX_AGE = 10 * 60 * 1000;
-
-app.use('/api', (req, res, next) => {
-  if (!['POST', 'PATCH'].includes(req.method)) return next();
-  const key = String(req.headers['idempotency-key'] || '').trim();
-  if (!key || key.length > 128) {
-    return res.status(400).json({ error: 'Idempotency-Key wajib disertakan untuk operasi perubahan data.' });
-  }
-  const cached = idempotencyCache.get(key);
-  if (cached) {
-    if (cached.pending) return res.status(409).json({ error: 'Permintaan yang sama sedang diproses.' });
-    return res.status(cached.status).json(cached.body);
-  }
-  idempotencyCache.set(key, { pending: true });
-  const originalJson = res.json.bind(res);
-  res.json = body => {
-    const entry = idempotencyCache.get(key);
-    if (entry) idempotencyCache.set(key, { status: res.statusCode, body });
-    originalJson(body);
-  };
-  res.on('finish', () => {
-    if (res.statusCode >= 500) idempotencyCache.delete(key);
-  });
-  setTimeout(() => idempotencyCache.delete(key), IDENTITY_CACHE_MAX_AGE);
-  next();
-});
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 function sendDatabaseError(res, error, status = 400) {
@@ -106,6 +82,61 @@ async function getAllRows(table, columns, orderColumn) {
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'ritme-api', time: new Date().toISOString() });
+});
+
+app.use('/api', async (req, res, next) => {
+  const authorization = req.headers.authorization || '';
+  const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  if (!token) return res.status(401).json({ error: 'Login diperlukan.' });
+
+  const { data: userData, error: authError } = await authClient.auth.getUser(token);
+  if (authError || !userData.user) return res.status(401).json({ error: 'Sesi login tidak valid.' });
+  const { data: admin, error: adminError } = await supabase.from('ritme_admins')
+    .select('user_id').eq('user_id', userData.user.id).maybeSingle();
+  if (adminError) return sendDatabaseError(res, adminError, 500);
+  if (!admin) return res.status(403).json({ error: 'Akun ini tidak memiliki akses administrator.' });
+  req.user = userData.user;
+  next();
+});
+
+const idempotencyCache = new Map();
+const IDEMPOTENCY_CACHE_MAX_SIZE = 1000;
+const IDEMPOTENCY_CACHE_TTL = 10 * 60 * 1000;
+
+app.use('/api', (req, res, next) => {
+  if (!['POST', 'PATCH'].includes(req.method)) return next();
+  const key = String(req.headers['idempotency-key'] || '').trim();
+  if (!key || key.length > 128) {
+    return res.status(400).json({ error: 'Idempotency-Key wajib disertakan untuk operasi perubahan data.' });
+  }
+  const now = Date.now();
+  for (const [cacheKey, entry] of idempotencyCache) {
+    if (entry.expiresAt <= now) idempotencyCache.delete(cacheKey);
+  }
+  const scopedKey = `${req.user.id}:${key}`;
+  const cached = idempotencyCache.get(scopedKey);
+  if (cached) {
+    if (cached.pending) return res.status(409).json({ error: 'Permintaan yang sama sedang diproses.' });
+    return res.status(cached.status).json(cached.body);
+  }
+  if (idempotencyCache.size >= IDEMPOTENCY_CACHE_MAX_SIZE) {
+    return res.status(503).json({ error: 'Antrean permintaan penuh. Coba lagi sebentar.' });
+  }
+  idempotencyCache.set(scopedKey, { pending: true, expiresAt: now + IDEMPOTENCY_CACHE_TTL });
+  const originalJson = res.json.bind(res);
+  res.json = body => {
+    const entry = idempotencyCache.get(scopedKey);
+    if (entry) {
+      if (res.statusCode >= 500) idempotencyCache.delete(scopedKey);
+      else idempotencyCache.set(scopedKey, {
+        status: res.statusCode,
+        body,
+        expiresAt: Date.now() + IDEMPOTENCY_CACHE_TTL
+      });
+    }
+    return originalJson(body);
+  };
+  next();
 });
 
 app.get('/api/dashboard', async (_req, res) => {

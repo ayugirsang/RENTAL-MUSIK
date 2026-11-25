@@ -12,6 +12,7 @@ const viewLabels = {
   income: 'Laporan pendapatan'
 };
 const supabaseClient = window.ritmeSupabaseClient;
+let appInitialized = false;
 
 function localDateValue(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -49,6 +50,13 @@ async function api(url, options = {}) {
   if (supabaseClient && window.RITME_CONFIG?.apiMode !== 'server') return supabaseApi(url, options);
   const apiBaseUrl = String(window.RITME_CONFIG?.apiBaseUrl || '').replace(/\/$/, '');
   const requestUrl = apiBaseUrl ? `${apiBaseUrl}${url}` : url;
+  const headers = {};
+  if (supabaseClient) {
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) throw new Error('Sesi login tidak dapat diverifikasi. Silakan masuk kembali.');
+    if (!data.session?.access_token) throw new Error('Sesi login berakhir. Silakan masuk kembali.');
+    headers.Authorization = `Bearer ${data.session.access_token}`;
+  }
   let response;
   try {
     response = await fetch(requestUrl, {
@@ -58,6 +66,7 @@ async function api(url, options = {}) {
         ...(options.method && options.method !== 'GET' && window.crypto?.randomUUID
           ? { 'Idempotency-Key': crypto.randomUUID() }
           : {}),
+        ...headers,
         ...options.headers
       }
     });
@@ -1252,7 +1261,7 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(link.href);
 }
 
-function initialize() {
+function initializeApplication() {
   const today = localDateValue();
   document.querySelector('#today-label').textContent = formatDate(today);
   document.querySelector('#current-month').textContent = new Intl.DateTimeFormat('id-ID', {
@@ -1501,4 +1510,98 @@ function initialize() {
   refreshAll().catch(error => notify(`Gagal memuat data: ${error.message}`, true));
 }
 
-document.addEventListener('DOMContentLoaded', initialize);
+function showAuthMessage(message, isSuccess = false) {
+  const element = document.querySelector('#auth-message');
+  element.textContent = message;
+  element.classList.toggle('is-success', isSuccess);
+}
+
+async function enterApplication(session) {
+  const gate = document.querySelector('#auth-gate');
+  const appShell = document.querySelector('.app-shell');
+  const avatar = document.querySelector('#account-avatar');
+  const { data, error } = await supabaseClient.from('ritme_admins')
+    .select('user_id')
+    .eq('user_id', session.user.id)
+    .maybeSingle();
+
+  if (error) {
+    showAuthMessage('Akses belum dapat diverifikasi. Pastikan administrator sudah disiapkan di Supabase.');
+    return false;
+  }
+  if (!data || data.user_id !== session.user.id) {
+    await supabaseClient.auth.signOut();
+    showAuthMessage('Akun ini belum diberi akses administrator.');
+    return false;
+  }
+
+  gate.hidden = true;
+  appShell.hidden = false;
+  avatar.textContent = (session.user.email || 'AD').slice(0, 2).toUpperCase();
+  avatar.setAttribute('aria-label', session.user.email || 'Administrator');
+  showAuthMessage('', true);
+  if (!appInitialized) {
+    appInitialized = true;
+    initializeApplication();
+  } else {
+    refreshAll().catch(error => notify(`Gagal memuat data: ${error.message}`, true));
+  }
+  return true;
+}
+
+async function initializeAuthentication() {
+  const form = document.querySelector('#auth-form');
+  const button = document.querySelector('#auth-submit');
+  const appShell = document.querySelector('.app-shell');
+  if (!supabaseClient) {
+    showAuthMessage('Konfigurasi Supabase tidak tersedia. Aplikasi dikunci demi keamanan.');
+    return;
+  }
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (button.disabled) return;
+    button.disabled = true;
+    showAuthMessage('Memeriksa akun...', true);
+    try {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: document.querySelector('#auth-email').value.trim(),
+        password: document.querySelector('#auth-password').value
+      });
+      if (error) throw error;
+      if (!data.session) throw new Error('Sesi login tidak berhasil dibuat.');
+      if (await enterApplication(data.session)) form.reset();
+    } catch (error) {
+      showAuthMessage(error.message || 'Login gagal. Periksa email dan kata sandi.');
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  document.querySelector('#logout-button').addEventListener('click', async event => {
+    const logoutButton = event.currentTarget;
+    logoutButton.disabled = true;
+    try {
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) throw error;
+      appShell.hidden = true;
+      document.querySelector('#auth-gate').hidden = false;
+      document.querySelector('#auth-password').value = '';
+      showAuthMessage('Anda sudah keluar.', true);
+    } catch (error) {
+      notify(`Gagal keluar: ${error.message}`, true);
+    } finally {
+      logoutButton.disabled = false;
+    }
+  });
+
+  try {
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) throw error;
+    if (data.session) await enterApplication(data.session);
+  } catch (error) {
+    showAuthMessage(`Tidak dapat memeriksa sesi login: ${error.message}`);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initializeAuthentication);
