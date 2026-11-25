@@ -4,37 +4,36 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0d1524">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
   <title>Ritme | Akuntansi Rental Musik</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=multi-role-access-1">
+  <link rel="stylesheet" href="css/style.css?v=admin-auth-1">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase.js"></script>
-  <script src="js/app.js?v=multi-role-access-1" defer></script>
+  <script src="js/app.js?v=admin-auth-1" defer></script>
 </head>
 <body>
-  <main class="login-screen" id="login-screen">
-    <section class="login-card" aria-labelledby="login-title">
-      <a class="brand login-brand" href="#" aria-label="Ritme">
+  <section class="auth-gate" id="auth-gate" aria-labelledby="auth-title">
+    <form class="auth-card" id="auth-form">
+      <a class="brand auth-brand" href="#" aria-label="Ritme">
         <span class="brand-mark" aria-hidden="true"><img src="img/logo.svg" alt=""></span>
         <span><strong>ritme</strong><small>RENTAL & ACCOUNTING</small></span>
       </a>
-      <div class="eyebrow">RUANG KERJA USAHA</div>
-      <h1 id="login-title">Masuk ke Ritme</h1>
-      <p>Gunakan akun yang telah diberi akses oleh administrator.</p>
-      <form class="login-form" id="login-form">
-        <label class="field-label" for="login-email">Email</label>
-        <input id="login-email" name="email" type="email" autocomplete="username" required maxlength="254">
-        <label class="field-label" for="login-password">Kata sandi</label>
-        <input id="login-password" name="password" type="password" autocomplete="current-password" required>
-        <button class="button button-dark button-wide" type="submit">Masuk <span aria-hidden="true">→</span></button>
-      </form>
-      <p class="login-message" id="login-message" role="status" aria-live="polite"></p>
-    </section>
-  </main>
-  <div class="app-shell" id="app-shell" hidden>
+      <div class="eyebrow">AKSES ADMIN</div>
+      <h1 id="auth-title">Masuk ke Ritme</h1>
+      <p>Gunakan akun admin yang telah diizinkan untuk mengakses data usaha.</p>
+      <label class="auth-field" for="auth-email">Email</label>
+      <input id="auth-email" name="email" type="email" autocomplete="username" required>
+      <label class="auth-field" for="auth-password">Kata sandi</label>
+      <input id="auth-password" name="password" type="password" autocomplete="current-password" required>
+      <button class="button button-dark auth-submit" id="auth-submit" type="submit">Masuk</button>
+      <p class="auth-message" id="auth-message" role="status" aria-live="polite"></p>
+    </form>
+  </section>
+  <div class="app-shell" hidden>
     <aside class="sidebar">
       <a class="brand" href="#dashboard" aria-label="Ritme, halaman ringkasan">
         <span class="brand-mark" aria-hidden="true"><img src="img/logo.svg" alt=""></span>
@@ -43,14 +42,13 @@
       <div class="side-caption">UTAMA</div>
       <nav class="main-nav" aria-label="Navigasi utama">
         <button class="nav-link is-active" type="button" data-view="dashboard"><span class="nav-icon">◫</span>Ringkasan</button>
-        <div class="nav-group-label" data-roles="admin,operasional">OPERASIONAL</div>
+        <div class="nav-group-label">OPERASIONAL</div>
         <button class="nav-link" type="button" data-view="transactions"><span class="nav-icon">⇄</span>Rental & pembayaran</button>
         <button class="nav-link" type="button" data-view="details"><span class="nav-icon">▦</span>Pelanggan & inventaris</button>
-        <div class="nav-group-label" data-roles="admin,akuntansi">AKUNTANSI</div>
+        <div class="nav-group-label">AKUNTANSI</div>
         <button class="nav-link" type="button" data-view="reports"><span class="nav-icon">▤</span>Jurnal umum</button>
         <button class="nav-link" type="button" data-view="ledger"><span class="nav-icon">▥</span>Buku besar</button>
         <button class="nav-link" type="button" data-view="income"><span class="nav-icon">◒</span>Laporan pendapatan</button>
-        <button class="nav-link" type="button" data-view="access"><span class="nav-icon">♙</span>Kelola akses</button>
       </nav>
       <div class="sidebar-bottom">
         <div class="side-caption">PERIODE BERJALAN</div>
@@ -62,20 +60,20 @@
     <main class="main-content">
       <header class="topbar">
         <div class="breadcrumb"><span>Usaha rental alat musik</span><span class="crumb-divider">/</span><strong id="page-label">Ringkasan</strong></div>
-        <div class="topbar-right"><span class="today-label" id="today-label"></span><button class="refresh-button" id="refresh-data" type="button" aria-label="Muat ulang data" title="Muat ulang data">↻</button><span class="current-user" id="current-user"></span><button class="button button-outline button-small" id="sign-out" type="button">Keluar</button></div>
+        <div class="topbar-right"><span class="today-label" id="today-label"></span><button class="refresh-button" id="refresh-data" type="button" aria-label="Muat ulang data" title="Muat ulang data">↻</button><span class="avatar" id="account-avatar" aria-label="Administrator">AD</span><button class="button button-outline button-small" id="logout-button" type="button">Keluar</button></div>
       </header>
 
       <section class="view is-visible" id="view-dashboard" aria-labelledby="dashboard-title">
         <div class="page-heading">
           <div><div class="eyebrow">RUANG KERJA PENJUAL</div><h1 id="dashboard-title">Ringkasan usaha hari ini.</h1><p>Pantau penyewaan, stok alat, dan hal yang perlu ditindaklanjuti.</p></div>
-          <button class="button button-dark" type="button" data-go="transactions" data-roles="admin,operasional"><span aria-hidden="true">＋</span> Transaksi baru</button>
+          <button class="button button-dark" type="button" data-go="transactions"><span aria-hidden="true">＋</span> Transaksi baru</button>
         </div>
         <section class="instrument-hero" aria-labelledby="instrument-hero-title">
           <div class="instrument-hero-copy">
             <div class="eyebrow">KOLEKSI RITME</div>
             <h2 id="instrument-hero-title">Temukan suara untuk cerita berikutnya.</h2>
             <p>Dari petikan gitar hingga dentuman drum, pilih alat musik yang paling pas untuk kebutuhanmu.</p>
-            <button class="button button-hero" type="button" data-go="transactions" data-roles="admin,operasional">Jelajahi alat musik <span aria-hidden="true">→</span></button>
+            <button class="button button-hero" type="button" data-go="transactions">Jelajahi alat musik <span aria-hidden="true">→</span></button>
           </div>
           <div class="instrument-hero-gallery" aria-label="Pilihan alat musik">
             <img class="hero-photo-main" src="img/instruments/electric-guitar.jpg" alt="Gitar elektrik di studio">
@@ -92,19 +90,7 @@
           <article class="metric metric-paper"><div class="metric-top"><span>Jatuh tempo ≤ 3 hari</span><span class="metric-icon icon-yellow">◷</span></div><strong id="metric-due-soon">0</strong><div class="metric-foot">Segera disiapkan</div></article>
           <article class="metric metric-paper"><div class="metric-top"><span>Terlambat</span><span class="metric-icon icon-coral">⌁</span></div><strong id="metric-late">0</strong><div class="metric-foot">Perlu ditindaklanjuti</div></article>
         </div>
-        <div class="dashboard-financial-grid">
-          <section class="panel trend-panel">
-            <div class="panel-heading"><div><div class="eyebrow">TREN HARIAN</div><h2>Pendapatan tercatat bulan ini</h2></div><span class="chart-period" id="dashboard-period"></span></div>
-            <div class="chart-legend"><span><i class="legend-rent"></i>Pendapatan sewa</span><span><i class="legend-fine"></i>Pendapatan denda</span></div>
-            <div id="revenue-chart" class="revenue-chart" role="img" aria-label="Grafik pendapatan harian"></div>
-          </section>
-          <section class="panel monthly-summary-panel">
-            <div class="panel-heading"><div><div class="eyebrow">RINGKASAN PERIODE</div><h2>Keuangan bulan ini</h2></div></div>
-            <div id="monthly-income-summary" class="monthly-income-summary"></div>
-            <small class="field-hint">Pendapatan adalah nilai yang diakui. Kas diterima hanya menghitung pembayaran yang tercatat.</small>
-          </section>
-        </div>
-        <div class="dashboard-grid" data-hide-roles="akuntansi">
+        <div class="dashboard-grid">
           <section class="panel due-panel">
             <div class="panel-heading"><div><div class="eyebrow">PANTAU OPERASIONAL</div><h2>Jadwal pengembalian</h2></div><button class="text-button" type="button" data-go="transactions">Kelola rental <span>→</span></button></div>
             <div class="dashboard-filters" role="group" aria-label="Filter jadwal pengembalian">
@@ -119,6 +105,18 @@
             <div class="note-mark" aria-hidden="true">✓</div><div class="eyebrow">DAFTAR TINDAK LANJUT</div><h2>Ringkas, lalu lanjutkan pekerjaan.</h2><div id="seller-followup" class="followup-list"><span class="followup-item">Memuat aktivitas hari ini...</span></div><button class="button button-outline button-small followup-action" type="button" data-go="transactions">Buka operasional <span>→</span></button>
           </aside>
         </div>
+        <div class="dashboard-financial-grid">
+          <section class="panel trend-panel">
+            <div class="panel-heading"><div><div class="eyebrow">TREN HARIAN</div><h2>Pendapatan tercatat bulan ini</h2></div><span class="chart-period" id="dashboard-period"></span></div>
+            <div class="chart-legend"><span><i class="legend-rent"></i>Pendapatan sewa</span><span><i class="legend-fine"></i>Pendapatan denda</span></div>
+            <div id="revenue-chart" class="revenue-chart" role="img" aria-label="Grafik pendapatan harian"></div>
+          </section>
+          <section class="panel monthly-summary-panel">
+            <div class="panel-heading"><div><div class="eyebrow">RINGKASAN PERIODE</div><h2>Keuangan bulan ini</h2></div></div>
+            <div id="monthly-income-summary" class="monthly-income-summary"></div>
+            <small class="field-hint">Pendapatan adalah nilai yang diakui. Kas diterima hanya menghitung pembayaran yang tercatat.</small>
+          </section>
+        </div>
       </section>
 
       <section class="view" id="view-transactions" aria-labelledby="transactions-title">
@@ -127,10 +125,10 @@
           <section class="panel form-panel"><div class="panel-heading"><div><div class="eyebrow">01 / MULAI RENTAL</div><h2>Penyewaan baru</h2></div><span class="step-mark">01</span></div>
             <form id="rental-form" class="form-stack">
               <label class="field-label" for="rental-customer">Pelanggan <span class="required">*</span></label>
-              <div class="inline-field"><select id="rental-customer" required><option value="">Pilih pelanggan</option></select><button class="square-button" id="toggle-customer-form" type="button" aria-label="Tambah pelanggan" aria-expanded="false" title="Tambah pelanggan">＋</button></div>
+              <div class="inline-field"><select id="rental-customer" required><option value="">Pilih pelanggan</option></select><button class="square-button" id="toggle-customer-form" type="button" aria-label="Tambah pelanggan" title="Tambah pelanggan">＋</button></div>
               <div class="customer-create" id="customer-create" hidden>
-                <label class="field-label" for="customer-name">Nama pelanggan</label><input id="customer-name" name="nama" autocomplete="name" maxlength="120" aria-required="true" placeholder="Nama lengkap">
-                <div class="field-pair"><div><label class="field-label" for="customer-phone">Nomor HP</label><input id="customer-phone" name="no_hp" type="tel" autocomplete="tel" maxlength="40" aria-required="true" placeholder="08xxxxxxxxxx"></div><div><label class="field-label" for="customer-address">Alamat</label><input id="customer-address" name="alamat" maxlength="500" placeholder="Kota / alamat"></div></div>
+                <label class="field-label" for="customer-name">Nama pelanggan</label><input id="customer-name" name="nama" autocomplete="name" placeholder="Nama lengkap">
+                <div class="field-pair"><div><label class="field-label" for="customer-phone">Nomor HP</label><input id="customer-phone" name="no_hp" autocomplete="tel" placeholder="08xxxxxxxxxx"></div><div><label class="field-label" for="customer-address">Alamat</label><input id="customer-address" name="alamat" placeholder="Kota / alamat"></div></div>
                 <button class="button button-outline button-small" id="save-customer" type="button">Simpan pelanggan</button>
               </div>
               <div class="field-pair"><div><label class="field-label" for="rental-date">Tanggal sewa <span class="required">*</span></label><input id="rental-date" type="date" required></div><div><label class="field-label" for="planned-date">Rencana kembali <span class="required">*</span></label><input id="planned-date" type="date" required></div></div>
@@ -184,9 +182,8 @@
       <section class="view" id="view-details" aria-labelledby="details-title">
         <div class="page-heading"><div><div class="eyebrow">DATA USAHA</div><h1 id="details-title">Pelanggan & inventaris</h1><p>Kelola data pelanggan dan inventaris, telusuri riwayat pembayaran, serta pantau performa usaha.</p></div><button class="button button-outline" id="download-detail-csv" type="button"><span aria-hidden="true">↓</span> Unduh laporan CSV</button></div>
         <section class="panel detail-panel">
-          <div class="detail-section" data-roles="admin,operasional">
+          <div class="detail-section">
             <div class="panel-heading"><div><div class="eyebrow">PELANGGAN</div><h2>Daftar pelanggan</h2></div></div>
-            <small class="field-hint">Klik dua kali pada baris untuk mengedit, atau gunakan tombol Ubah.</small>
             <div id="customer-list" class="table-wrap"><div class="quiet-message">Memuat daftar pelanggan...</div></div>
           </div>
           <div class="detail-section">
@@ -209,10 +206,9 @@
           </div>
           <div class="detail-section">
             <div class="panel-heading"><div><div class="eyebrow">INVENTARIS</div><h2>Performa per alat</h2></div></div>
-            <small class="field-hint">Klik dua kali pada baris untuk mengedit, atau gunakan tombol Ubah.</small>
             <div id="equipment-report" class="table-wrap"><div class="quiet-message">Memuat ringkasan inventaris...</div></div>
           </div>
-          <div class="detail-section" data-roles="admin,akuntansi">
+          <div class="detail-section">
             <div class="panel-heading"><div><div class="eyebrow">LAPORAN KEUANGAN</div><h2>Rekap berdasarkan periode</h2></div></div>
             <div class="report-filters">
               <div><label class="field-label" for="report-start">Dari tanggal</label><input id="report-start" type="date"></div>
@@ -260,19 +256,6 @@
           <div id="income-metrics" class="report-metrics income-metrics"></div>
           <div class="income-explanation"><strong>Perbedaan penting</strong><span>Pendapatan sewa diakui saat transaksi rental baru dicatat; untuk data sewa lama yang belum direkonsiliasi, pendapatan diakui saat pembayaran diterima. Kas diterima hanya menjumlah pembayaran yang tercatat.</span></div>
           <div id="income-report" class="table-wrap"></div>
-        </section>
-      </section>
-      <section class="view" id="view-access" aria-labelledby="access-title">
-        <div class="page-heading"><div><div class="eyebrow">PENGATURAN ADMINISTRATOR</div><h1 id="access-title">Kelola akses</h1><p>Undang staf dan batasi akses sesuai tugasnya. Akuntansi hanya dapat melihat jurnal dan laporan.</p></div></div>
-        <section class="panel access-panel">
-          <form id="admin-user-form" class="access-invite-form">
-            <div><label class="field-label" for="admin-user-email">Email pengguna</label><input id="admin-user-email" type="email" name="email" autocomplete="email" maxlength="254" required placeholder="nama@contoh.com"></div>
-            <div><label class="field-label" for="admin-user-role">Peran</label><select id="admin-user-role" name="role" required><option value="operasional">Operasional</option><option value="akuntansi">Akuntansi</option><option value="admin">Administrator</option></select></div>
-            <button class="button button-dark" type="submit">Undang pengguna</button>
-          </form>
-          <p class="field-hint">Pengguna baru menerima undangan melalui email Supabase. Pastikan SMTP/email provider Supabase sudah dikonfigurasi.</p>
-          <div class="table-wrap"><table class="access-table"><thead><tr><th>EMAIL</th><th>PERAN</th><th>DITAMBAHKAN</th><th>AKSI</th></tr></thead>
-            <tbody id="admin-users-table"><tr><td class="empty-cell" colspan="4">Memuat pengguna...</td></tr></tbody></table></div>
         </section>
       </section>
       <dialog class="record-editor" id="record-editor" aria-labelledby="record-editor-title">

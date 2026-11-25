@@ -157,7 +157,9 @@ Deployment: GitHub Actions -> konfigurasi runtime -> GitHub Pages
 
 Konfigurasi deployment membaca `SUPABASE_URL` dan
 `SUPABASE_PUBLISHABLE_KEY` dari GitHub Actions secrets untuk membuat berkas
-runtime. Frontend tidak menyimpan service-role key.
+runtime. Frontend menggunakan Supabase Auth; RLS membatasi seluruh tabel
+aplikasi ke akun yang terdaftar pada `public.ritme_admins`. Frontend tidak
+menyimpan service-role key.
 
 ## 5. Desain fisik
 
@@ -189,10 +191,11 @@ tersedia pada bagian **Entity Relationship Diagram (ERD)** di [README](../README
 - Repository mengabaikan `.env` dan `frontend/js/config.js`; keduanya tidak
   boleh ditambahkan ke commit.
 
-**Pengendalian akses:** aplikasi memakai Supabase Auth, peran allowlist, dan API
-server. Migrasi `20261126_multi_role_access.sql` mencabut akses langsung role
-`anon`/`authenticated` ke tabel usaha; service-role key hanya digunakan server.
-Backup dan pemulihan database tetap harus disiapkan dan diuji sebelum produksi.
+**Batasan pengendalian:** akses dashboard memerlukan akun Supabase Auth yang
+diizinkan melalui `public.ritme_admins`. Role `anon` tidak memiliki akses ke
+tabel aplikasi; pembayaran dan jurnal juga tidak dapat diubah atau dihapus oleh
+role aplikasi. Tetap aktifkan backup Supabase dan tinjau kebijakan serta akun
+admin secara berkala.
 
 ## 6. Implementasi dan konversi
 
@@ -215,15 +218,14 @@ Backup dan pemulihan database tetap harus disiapkan dan diuji sebelum produksi.
    database yang sudah berisi data.
 2. Untuk database baru, jalankan skema, fungsi/trigger, lalu seed sesuai
    petunjuk README. Untuk database lama, tinjau dan jalankan migrasi yang
-   diperlukan satu kali; jangan menjalankan migrasi tanpa memeriksa kondisi
-   skema dan backup.
-3. Atur `API_BASE_URL`, `SUPABASE_URL`, dan `SUPABASE_PUBLISHABLE_KEY` di GitHub
-   Actions secrets. Simpan `SUPABASE_SERVICE_ROLE_KEY` dan
-   `API_ALLOWED_ORIGINS` hanya di environment service API; jangan pernah kirim
-   service-role key ke browser, chat, atau commit.
-4. Jalankan pemeriksaan lokal, tinjau perubahan, lalu push ke branch `main`
+   diperlukan satu kali; jalankan migration admin/RLS setelah backup.
+3. Nonaktifkan pendaftaran publik, buat akun admin secara manual, lalu
+   masukkan UUID akun ke `public.ritme_admins`.
+4. Atur `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY` di GitHub Actions secrets.
+   Jangan mengirim service-role key ke browser, chat, atau commit.
+5. Jalankan pemeriksaan lokal, tinjau perubahan, lalu push ke branch `main`
    melalui akun yang memiliki izin.
-5. Periksa hasil workflow CI dan Pages. Lakukan uji alur transaksi menggunakan
+6. Periksa hasil workflow CI dan Pages. Lakukan uji alur transaksi menggunakan
    data fiktif sebelum menyatakan rilis siap.
 
 ### 6.3 Uji penerimaan
