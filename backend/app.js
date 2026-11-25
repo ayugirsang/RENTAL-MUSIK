@@ -6,6 +6,7 @@ const path = require('path');
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const API_ALLOWED_ORIGIN = process.env.API_ALLOWED_ORIGIN;
 
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, dan SUPABASE_SERVICE_ROLE_KEY wajib diisi di file .env.');
@@ -18,14 +19,59 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false }
 });
 
-app.use(express.json());
+app.disable('x-powered-by');
+app.use(express.json({ limit: '64kb' }));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  if (API_ALLOWED_ORIGIN) {
+    res.setHeader('Access-Control-Allow-Origin', API_ALLOWED_ORIGIN);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Idempotency-Key');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  if (API_ALLOWED_ORIGIN && req.headers.origin && req.headers.origin !== API_ALLOWED_ORIGIN) {
+    return res.status(403).json({ error: 'Origin tidak diizinkan.' });
+  }
+  next();
+});
 app.get('/js/config.js', (_req, res) => {
   res.type('application/javascript').send(`window.RITME_CONFIG = ${JSON.stringify({
     supabaseUrl: SUPABASE_URL,
     supabasePublishableKey: SUPABASE_PUBLISHABLE_KEY,
     apiMode: 'server',
-    apiUrl: ''
+    apiBaseUrl: ''
   })};\n`);
+});
+
+const idempotencyCache = new Map();
+const IDENTITY_CACHE_MAX_AGE = 10 * 60 * 1000;
+
+app.use('/api', (req, res, next) => {
+  if (!['POST', 'PATCH'].includes(req.method)) return next();
+  const key = String(req.headers['idempotency-key'] || '').trim();
+  if (!key || key.length > 128) {
+    return res.status(400).json({ error: 'Idempotency-Key wajib disertakan untuk operasi perubahan data.' });
+  }
+  const cached = idempotencyCache.get(key);
+  if (cached) {
+    if (cached.pending) return res.status(409).json({ error: 'Permintaan yang sama sedang diproses.' });
+    return res.status(cached.status).json(cached.body);
+  }
+  idempotencyCache.set(key, { pending: true });
+  const originalJson = res.json.bind(res);
+  res.json = body => {
+    const entry = idempotencyCache.get(key);
+    if (entry) idempotencyCache.set(key, { status: res.statusCode, body });
+    originalJson(body);
+  };
+  res.on('finish', () => {
+    if (res.statusCode >= 500) idempotencyCache.delete(key);
+  });
+  setTimeout(() => idempotencyCache.delete(key), IDENTITY_CACHE_MAX_AGE);
+  next();
 });
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 

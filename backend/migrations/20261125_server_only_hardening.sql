@@ -1,6 +1,4 @@
--- Apply after deploying the Express API with SUPABASE_SERVICE_ROLE_KEY.
--- This closes direct browser access through the anon publishable key.
-
+-- Jalankan sebagai owner/database role yang dapat mengubah policy.
 revoke all on table
   public.pelanggan,
   public.alat_musik,
@@ -13,16 +11,18 @@ revoke all on table
 from anon, authenticated;
 
 revoke all on all sequences in schema public from anon, authenticated;
+revoke execute on function public.buat_penyewaan(bigint, date, date, jsonb) from anon, authenticated;
 
 do $$
 declare
-  table_name text;
+  nama_tabel text;
 begin
-  foreach table_name in array array[
+  foreach nama_tabel in array array[
     'pelanggan', 'alat_musik', 'penyewaan', 'detail_penyewaan',
     'pengembalian', 'pembayaran_denda', 'pembayaran_sewa', 'jurnal_akuntansi'
   ] loop
-    execute format('drop policy if exists %I on public.%I', 'demo_anon_access_' || table_name, table_name);
+    execute format('alter table public.%I enable row level security', nama_tabel);
+    execute format('drop policy if exists %I on public.%I', 'demo_anon_access_' || nama_tabel, nama_tabel);
   end loop;
 end;
 $$;

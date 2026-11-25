@@ -13,5 +13,7 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: API_ALLOWED_ORIGIN
+        sync: false
       - key: PORT
         value: 10000

@@ -111,7 +111,11 @@ grant select, insert, update, delete on table
   public.jurnal_akuntansi
 to anon, authenticated;
 grant usage, select on all sequences in schema public to anon, authenticated;
-revoke update, delete on table public.pembayaran_sewa from anon, authenticated;
+revoke update, delete on table
+  public.pembayaran_sewa,
+  public.pembayaran_denda,
+  public.jurnal_akuntansi
+from anon, authenticated;
 
 
 -- Aplikasi tanpa login untuk prototipe akademik. Amankan sebelum penggunaan publik.

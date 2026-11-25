@@ -200,9 +200,11 @@ git diff --check
 
 Repository ini memiliki workflow **Deploy GitHub Pages**. Untuk menyiapkan deployment:
 
-1. Tambahkan repository secrets `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY` melalui **Settings → Secrets and variables → Actions**.
-2. Pastikan GitHub Pages menggunakan source **GitHub Actions** di **Settings → Pages**.
-3. Push perubahan ke branch `main`; workflow akan membangun konfigurasi frontend dan menerbitkan situs.
+1. Deploy backend Express di Render dan tambahkan environment `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, serta `API_ALLOWED_ORIGIN=https://ayugirsang.github.io`.
+2. Jalankan migration `backend/migrations/20261125_server_only_hardening.sql` pada proyek Supabase untuk mencabut akses langsung role anonim.
+3. Tambahkan repository secret `API_BASE_URL` dengan URL Render, tanpa akhiran `/api`.
+4. Pastikan GitHub Pages menggunakan source **GitHub Actions** di **Settings → Pages**.
+5. Push perubahan ke branch `main`; workflow akan membangun konfigurasi frontend dan menerbitkan situs.
 
 URL demo proyek: <https://ayugirsang.github.io/RENTAL-MUSIK/>.
 
