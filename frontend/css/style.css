@@ -602,6 +602,11 @@ input:focus, select:focus { box-shadow: 0 0 0 3px #2864e81a; }
 .equipment-option strong { color: #2457bd; font-size: 10px; }
 .record-edit-button { padding: 6px 10px; border: 1px solid #d7e0ec; border-radius: 7px; background: #fff; color: #2457bd; cursor: pointer; font-size: 11px; font-weight: 700; }
 .record-edit-button:hover { border-color: #a9c1f1; background: #edf3ff; }
+.editable-row { cursor: pointer; }
+.editable-row:hover { background: #f7faff; }
+.editable-row:active { background: #eef4ff; }
+.table-toolbar { display: grid; gap: 7px; margin: 0 0 12px; max-width: 420px; }
+.table-toolbar input { width: 100%; }
 .record-editor { width: min(500px, calc(100% - 28px)); max-height: min(85vh, 720px); padding: 24px; overflow-y: auto; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); box-shadow: 0 24px 80px #172b4d30; }
 .record-editor::backdrop { background: #101a2b70; backdrop-filter: blur(3px); }
 .record-editor .panel-heading { margin-bottom: 22px; }

@@ -5,21 +5,26 @@ const path = require('path');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  console.error('SUPABASE_URL dan SUPABASE_PUBLISHABLE_KEY wajib diisi di file .env.');
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, dan SUPABASE_SERVICE_ROLE_KEY wajib diisi di file .env.');
   process.exit(1);
 }
 
 const app = express();
 const port = process.env.PORT || 3000;
-const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false }
+});
 
 app.use(express.json());
 app.get('/js/config.js', (_req, res) => {
   res.type('application/javascript').send(`window.RITME_CONFIG = ${JSON.stringify({
     supabaseUrl: SUPABASE_URL,
-    supabasePublishableKey: SUPABASE_PUBLISHABLE_KEY
+    supabasePublishableKey: SUPABASE_PUBLISHABLE_KEY,
+    apiMode: 'server',
+    apiUrl: ''
   })};\n`);
 });
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
@@ -37,20 +42,6 @@ function isValidDate(value) {
   return typeof value === 'string'
     && /^\d{4}-\d{2}-\d{2}$/.test(value)
     && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
-}
-
-async function getTotalFinePayments() {
-  let total = 0;
-  const pageSize = 500;
-  for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await supabase.from('pembayaran_denda')
-      .select('id_pembayaran, jumlah_bayar')
-      .order('id_pembayaran')
-      .range(offset, offset + pageSize - 1);
-    if (error) return { total, error };
-    total += data.reduce((sum, payment) => sum + Number(payment.jumlah_bayar), 0);
-    if (data.length < pageSize) return { total, error: null };
-  }
 }
 
 async function getAllRows(table, columns, orderColumn) {
@@ -72,12 +63,11 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.get('/api/dashboard', async (_req, res) => {
-  const [paymentsResult, rentalsResult, equipmentResult] = await Promise.all([
-    getTotalFinePayments(),
+  const [rentalsResult, equipmentResult] = await Promise.all([
     supabase.from('penyewaan').select('id_sewa, tgl_rencana_kembali').eq('status_sewa', 'Berlangsung'),
     supabase.from('alat_musik').select('id_alat, status')
   ]);
-  const error = paymentsResult.error || rentalsResult.error || equipmentResult.error;
+  const error = rentalsResult.error || equipmentResult.error;
   if (error) return sendDatabaseError(res, error, 500);
 
   const today = new Intl.DateTimeFormat('en-CA', {
@@ -90,7 +80,6 @@ app.get('/api/dashboard', async (_req, res) => {
     return days >= 0 && days <= 3;
   }).length;
   res.json({
-    totalDendaDibayar: paymentsResult.total,
     penyewaanBerlangsung: rentalsResult.data.length,
     penyewaanJatuhTempo: dueSoon,
     penyewaanTerlambat: rentalsResult.data.filter(row => row.tgl_rencana_kembali < today).length,

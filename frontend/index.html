@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css?v=master-data-edit-1">
-  <script src="js/app.js?v=master-data-edit-1" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase.js"></script>
+  <script src="js/app.js?v=master-data-edit-1" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -166,6 +166,7 @@
         <section class="panel detail-panel">
           <div class="detail-section">
             <div class="panel-heading"><div><div class="eyebrow">PELANGGAN</div><h2>Daftar pelanggan</h2></div></div>
+            <div class="table-toolbar"><label class="field-label" for="customer-search">Cari pelanggan</label><input id="customer-search" type="search" placeholder="Nama, nomor HP, atau alamat"></div>
             <div id="customer-list" class="table-wrap"><div class="quiet-message">Memuat daftar pelanggan...</div></div>
           </div>
           <div class="detail-section">
@@ -188,6 +189,7 @@
           </div>
           <div class="detail-section">
             <div class="panel-heading"><div><div class="eyebrow">INVENTARIS</div><h2>Performa per alat</h2></div></div>
+            <div class="table-toolbar"><label class="field-label" for="equipment-search">Cari inventaris</label><input id="equipment-search" type="search" placeholder="Nama atau status alat"></div>
             <div id="equipment-report" class="table-wrap"><div class="quiet-message">Memuat ringkasan inventaris...</div></div>
           </div>
           <div class="detail-section">

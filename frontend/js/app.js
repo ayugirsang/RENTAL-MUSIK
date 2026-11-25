@@ -1,4 +1,4 @@
-const state = { customers: [], equipment: [], rentals: [], unpaid: [], rentUnpaid: [], journals: [], detail: null, rentalFilter: 'all' };
+const state = { customers: [], equipment: [], rentals: [], unpaid: [], rentUnpaid: [], journals: [], detail: null, rentalFilter: 'all', customerSearch: '', equipmentSearch: '' };
 const currency = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const dateFormatter = new Intl.DateTimeFormat('id-ID', {
   timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric'
@@ -46,10 +46,11 @@ function countRentalDates(rentals, today = localDateValue()) {
 }
 
 async function api(url, options = {}) {
-  if (supabaseClient) return supabaseApi(url, options);
+  if (supabaseClient && window.RITME_CONFIG?.apiMode !== 'server') return supabaseApi(url, options);
   let response;
   try {
-    response = await fetch(url, {
+    const apiUrl = window.RITME_CONFIG?.apiUrl || '';
+    response = await fetch(`${apiUrl}${url}`, {
       ...options,
       headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers }
     });
@@ -65,21 +66,19 @@ async function supabaseApi(url, options = {}) {
   const body = options.body ? JSON.parse(options.body) : {};
   let result;
   if (url === '/api/dashboard') {
-    const [payments, rentals, equipment] = await Promise.all([
-      getTotalFinePayments(),
+    const [rentals, equipment] = await Promise.all([
       supabaseClient.from('penyewaan').select('id_sewa, tgl_rencana_kembali').eq('status_sewa', 'Berlangsung'),
       supabaseClient.from('alat_musik').select('id_alat, status')
     ]);
     const today = localDateValue();
     const rentalCounts = countRentalDates(rentals.data || [], today);
     result = { data: {
-      totalDendaDibayar: payments.total,
       penyewaanBerlangsung: rentals.data?.length,
       penyewaanJatuhTempo: rentalCounts.dueSoon,
       penyewaanTerlambat: rentalCounts.late,
       alatTersedia: equipment.data?.filter(row => row.status === 'Tersedia').length,
       alatDisewa: equipment.data?.filter(row => row.status === 'Disewa').length
-    }, error: payments.error || rentals.error || equipment.error };
+    }, error: rentals.error || equipment.error };
   } else if (url.startsWith('/api/pelanggan/') && options.method === 'PATCH') {
     const id = Number(url.split('/').pop());
     result = await supabaseClient.from('pelanggan').update(body)
@@ -213,20 +212,6 @@ async function supabaseApi(url, options = {}) {
   return result.data;
 }
 
-async function getTotalFinePayments() {
-  let total = 0;
-  const pageSize = 500;
-  for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await supabaseClient.from('pembayaran_denda')
-      .select('id_pembayaran, jumlah_bayar')
-      .order('id_pembayaran')
-      .range(offset, offset + pageSize - 1);
-    if (error) return { total, error };
-    total += data.reduce((sum, payment) => sum + Number(payment.jumlah_bayar), 0);
-    if (data.length < pageSize) return { total, error: null };
-  }
-}
-
 async function getAllSupabaseRows(table, columns, orderColumn) {
   const rows = [];
   const pageSize = 500;
@@ -252,8 +237,16 @@ function notify(message, isError = false) {
 
 function setBusy(form, busy) {
   const button = form.querySelector('[type="submit"]');
-  button.disabled = busy;
-  button.classList.toggle('is-busy', busy);
+  if (button) {
+    button.disabled = busy;
+    button.classList.toggle('is-busy', busy);
+  }
+  form.setAttribute('aria-busy', String(busy));
+  form.dataset.submitting = busy ? 'true' : 'false';
+}
+
+function confirmAction(message) {
+  return window.confirm(message);
 }
 
 async function loadDashboard() {
@@ -557,6 +550,7 @@ async function addEquipment() {
   } catch (error) {
     notify(`Gagal menambahkan alat: ${error.message}`, true);
   } finally {
+    form.dataset.submitting = 'false';
     button.disabled = false;
   }
 }
@@ -709,10 +703,13 @@ function renderDetailData() {
   const selectCustomer = document.querySelector('#history-customer');
   const previousCustomer = selectCustomer.value;
   const { customers, rentals, returns } = detailLookups();
-  const customerRows = [...data.customers].sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+  const customerQuery = state.customerSearch.trim().toLocaleLowerCase('id');
+  const customerRows = [...data.customers]
+    .filter(customer => `${customer.nama} ${customer.no_hp || ''} ${customer.alamat || ''}`.toLocaleLowerCase('id').includes(customerQuery))
+    .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
   document.querySelector('#customer-list').innerHTML = `<table><thead><tr><th>NAMA PELANGGAN</th><th>NOMOR HP</th><th>ALAMAT</th><th class="amount-cell">JUMLAH RENTAL</th><th>AKSI</th></tr></thead><tbody>${customerRows.map(customer => {
     const rentalCount = data.rentals.filter(rental => rental.id_pelanggan === customer.id_pelanggan).length;
-    return `<tr><td><strong>${escapeHtml(customer.nama)}</strong></td><td>${escapeHtml(customer.no_hp)}</td><td>${escapeHtml(customer.alamat || '—')}</td><td class="amount-cell">${rentalCount}</td>
+    return `<tr data-record-row data-record-type="customer" data-record-id="${customer.id_pelanggan}" class="editable-row"><td><strong>${escapeHtml(customer.nama)}</strong></td><td>${escapeHtml(customer.no_hp)}</td><td>${escapeHtml(customer.alamat || '—')}</td><td class="amount-cell">${rentalCount}</td>
       <td><button class="record-edit-button" type="button" data-edit-record="customer" data-record-id="${customer.id_pelanggan}">Ubah</button></td></tr>`;
   }).join('') || '<tr><td colspan="5" class="empty-cell">Belum ada pelanggan.</td></tr>'}</tbody></table>`;
   const returnRows = [...data.returns].sort((a, b) => b.id_pengembalian - a.id_pengembalian);
@@ -825,7 +822,10 @@ function renderCustomerHistory() {
 
 function renderEquipmentReport() {
   const { rentals, returns, rentalDetails, paymentsByReturn, equipment } = detailLookups();
-  const dataRows = state.detail.equipment.map(item => {
+  const equipmentQuery = state.equipmentSearch.trim().toLocaleLowerCase('id');
+  const dataRows = state.detail.equipment
+    .filter(item => `${item.nama_alat} ${item.status}`.toLocaleLowerCase('id').includes(equipmentQuery))
+    .map(item => {
     let rentalCount = 0;
     let rentalIncome = 0;
     let fines = 0;
@@ -850,7 +850,7 @@ function renderEquipmentReport() {
           .reduce((sum, payment) => sum + Number(payment.jumlah_bayar), 0) * share;
       }
     }
-    return `<tr><td><strong>${escapeHtml(item.nama_alat)}</strong><small>${currency.format(Number(item.harga_sewa_per_hari))} / hari</small></td>
+    return `<tr data-record-row data-record-type="equipment" data-record-id="${item.id_alat}" class="editable-row"><td><strong>${escapeHtml(item.nama_alat)}</strong><small>${currency.format(Number(item.harga_sewa_per_hari))} / hari</small></td>
       <td><span class="status-pill ${item.status === 'Disewa' ? 'status-late' : 'status-active'}">${escapeHtml(item.status)}</span></td>
       <td>${rentalCount}</td><td class="amount-cell">${currency.format(rentalIncome)}</td>
       <td class="amount-cell">${currency.format(fines)}</td><td class="amount-cell">${currency.format(paid)}</td>
@@ -899,6 +899,7 @@ async function saveRecordEdit(event) {
   const dialog = document.querySelector('#record-editor');
   const form = event.currentTarget;
   if (!form.reportValidity()) return;
+  if (form.dataset.submitting === 'true') return;
 
   const type = dialog.dataset.recordType;
   const id = Number(dialog.dataset.recordId);
@@ -919,6 +920,7 @@ async function saveRecordEdit(event) {
   }
 
   const button = form.querySelector('[type="submit"]');
+  form.dataset.submitting = 'true';
   button.disabled = true;
   try {
     await api(`/api/${type === 'customer' ? 'pelanggan' : 'alat-musik'}/${id}`, {
@@ -1327,6 +1329,20 @@ function initialize() {
       const button = event.target.closest('[data-edit-record]');
       if (button) openRecordEditor(button.dataset.editRecord, Number(button.dataset.recordId));
     });
+    container.addEventListener('dblclick', event => {
+      const row = event.target.closest('[data-record-row]');
+      if (!row) return;
+      openRecordEditor(row.dataset.recordType, Number(row.dataset.recordId));
+    });
+  });
+
+  document.querySelector('#customer-search').addEventListener('input', event => {
+    state.customerSearch = event.currentTarget.value;
+    renderDetailData();
+  });
+  document.querySelector('#equipment-search').addEventListener('input', event => {
+    state.equipmentSearch = event.currentTarget.value;
+    renderEquipmentReport();
   });
 
   document.querySelector('#toggle-customer-form').addEventListener('click', () => {
@@ -1370,8 +1386,10 @@ function initialize() {
   document.querySelector('#rental-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget;
+    if (form.dataset.submitting === 'true') return;
     const items = [...form.querySelectorAll('input[name="equipment"]:checked')].map(input => ({ id_alat: Number(input.value) }));
     if (!items.length) return notify('Pilih minimal satu unit alat musik.', true);
+    if (!confirmAction('Konfirmasi penyewaan baru dan buat catatan pembukuan?')) return;
     setBusy(form, true);
     try {
       const result = await api('/api/penyewaan', { method: 'POST', body: JSON.stringify({
@@ -1396,6 +1414,9 @@ function initialize() {
   document.querySelector('#return-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget;
+    if (form.dataset.submitting === 'true') return;
+    if (!document.querySelector('#return-rental').value) return notify('Pilih penyewaan yang dikembalikan.', true);
+    if (!confirmAction('Konfirmasi pengembalian alat dan hitung denda jika ada?')) return;
     setBusy(form, true);
     try {
       const result = await api('/api/pengembalian', { method: 'POST', body: JSON.stringify({
@@ -1418,11 +1439,13 @@ function initialize() {
   document.querySelector('#payment-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget;
+    if (form.dataset.submitting === 'true') return;
     const amount = Number(document.querySelector('#payment-amount').value);
     const selected = state.unpaid.find(item => String(item.id_pengembalian) === document.querySelector('#payment-return').value);
     if (!selected || !Number.isFinite(amount) || amount <= 0) return notify('Pilih tagihan dan masukkan nominal cicilan yang valid.', true);
     if (amount > selected.sisa_denda) return notify('Jumlah pembayaran melebihi sisa denda.', true);
     const remaining = selected.sisa_denda - amount;
+    if (!confirmAction(`Konfirmasi pembayaran denda sebesar ${currency.format(amount)}?`)) return;
     setBusy(form, true);
     try {
       await api('/api/pembayaran-denda', { method: 'POST', body: JSON.stringify({
@@ -1448,6 +1471,7 @@ function initialize() {
   document.querySelector('#rent-payment-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget;
+    if (form.dataset.submitting === 'true') return;
     const idSewa = document.querySelector('#payment-rental').value;
     const amount = Number(document.querySelector('#rent-payment-amount').value);
     const selected = state.rentUnpaid.find(item => String(item.id_sewa) === idSewa);
@@ -1456,6 +1480,7 @@ function initialize() {
     }
     if (amount > selected.sisa_tagihan) return notify('Jumlah pembayaran melebihi sisa tagihan sewa.', true);
     const remaining = selected.sisa_tagihan - amount;
+    if (!confirmAction(`Konfirmasi pembayaran sewa sebesar ${currency.format(amount)}?`)) return;
     setBusy(form, true);
     try {
       await api('/api/pembayaran-sewa', { method: 'POST', body: JSON.stringify({

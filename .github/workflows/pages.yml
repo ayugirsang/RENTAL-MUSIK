@@ -28,8 +28,9 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          RENDER_API_URL: ${{ secrets.RENDER_API_URL }}
         run: |
-          node -e "const fs=require('fs'); const config={supabaseUrl:process.env.SUPABASE_URL,supabasePublishableKey:process.env.SUPABASE_PUBLISHABLE_KEY}; if(!config.supabaseUrl||!config.supabasePublishableKey) process.exit(1); fs.writeFileSync('frontend/js/config.js','window.RITME_CONFIG = '+JSON.stringify(config)+';\\n')"
+          node -e "const fs=require('fs'); const apiUrl=(process.env.RENDER_API_URL||'').replace(/\/$/,''); const config={supabaseUrl:process.env.SUPABASE_URL,supabasePublishableKey:process.env.SUPABASE_PUBLISHABLE_KEY,apiMode:apiUrl?'server':'supabase',apiUrl}; if(!config.supabaseUrl||!config.supabasePublishableKey) process.exit(1); fs.writeFileSync('frontend/js/config.js','window.RITME_CONFIG = '+JSON.stringify(config)+';\\n')"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
