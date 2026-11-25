@@ -252,7 +252,6 @@ RENTAL-MUSIK/
 ├── .gitignore                           Mengecualikan dependensi dan konfigurasi rahasia
 ├── package.json                         Perintah dan dependensi Node.js
 ├── package-lock.json                    Versi dependensi yang terkunci
-├── render.yaml                          Konfigurasi deployment server Render
 └── README.md                            Dokumentasi proyek
 ```
 
