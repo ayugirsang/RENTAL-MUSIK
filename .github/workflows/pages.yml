@@ -26,9 +26,10 @@ jobs:
 
       - name: Build runtime configuration
         env:
-          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
-          node -e "const fs=require('fs'); const config={apiMode:'server',apiBaseUrl:process.env.API_BASE_URL||''}; if(!config.apiBaseUrl) process.exit(1); fs.writeFileSync('frontend/js/config.js','window.RITME_CONFIG = '+JSON.stringify(config)+';\\n')"
+          node -e "const fs=require('fs'); const config={supabaseUrl:process.env.SUPABASE_URL,supabasePublishableKey:process.env.SUPABASE_PUBLISHABLE_KEY,apiMode:'direct'}; if(!config.supabaseUrl||!config.supabasePublishableKey) process.exit(1); fs.writeFileSync('frontend/js/config.js','window.RITME_CONFIG = '+JSON.stringify(config)+';\\n')"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

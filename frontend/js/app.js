@@ -11,7 +11,7 @@ const viewLabels = {
   ledger: 'Buku besar',
   income: 'Laporan pendapatan'
 };
-const supabaseClient = null;
+const supabaseClient = window.ritmeSupabaseClient;
 
 function localDateValue(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -46,6 +46,7 @@ function countRentalDates(rentals, today = localDateValue()) {
 }
 
 async function api(url, options = {}) {
+  if (supabaseClient && window.RITME_CONFIG?.apiMode !== 'server') return supabaseApi(url, options);
   const apiBaseUrl = String(window.RITME_CONFIG?.apiBaseUrl || '').replace(/\/$/, '');
   const requestUrl = apiBaseUrl ? `${apiBaseUrl}${url}` : url;
   let response;
@@ -54,7 +55,9 @@ async function api(url, options = {}) {
       ...options,
       headers: {
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(options.method && options.method !== 'GET' ? { 'Idempotency-Key': crypto.randomUUID() } : {}),
+        ...(options.method && options.method !== 'GET' && window.crypto?.randomUUID
+          ? { 'Idempotency-Key': crypto.randomUUID() }
+          : {}),
         ...options.headers
       }
     });
