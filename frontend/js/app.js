@@ -1,4 +1,4 @@
-const state = { customers: [], equipment: [], rentals: [], unpaid: [], rentUnpaid: [], journals: [], detail: null, rentalFilter: 'all' };
+const state = { customers: [], equipment: [], rentals: [], unpaid: [], rentUnpaid: [], journals: [], detail: null, adminUsers: [], rentalFilter: 'all' };
 const currency = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const dateFormatter = new Intl.DateTimeFormat('id-ID', {
   timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric'
@@ -9,9 +9,17 @@ const viewLabels = {
   details: 'Pelanggan & inventaris',
   reports: 'Jurnal umum',
   ledger: 'Buku besar',
-  income: 'Laporan pendapatan'
+  income: 'Laporan pendapatan',
+  access: 'Kelola akses'
 };
+const roleViews = {
+  admin: ['dashboard', 'transactions', 'details', 'reports', 'ledger', 'income', 'access'],
+  operasional: ['dashboard', 'transactions', 'details'],
+  akuntansi: ['dashboard', 'reports', 'ledger', 'income']
+};
+const roleLabels = { admin: 'Administrator', operasional: 'Operasional', akuntansi: 'Akuntansi' };
 const supabaseClient = window.ritmeSupabaseClient;
+let currentUser = null;
 let appInitialized = false;
 
 function localDateValue(date = new Date()) {
@@ -47,26 +55,19 @@ function countRentalDates(rentals, today = localDateValue()) {
 }
 
 async function api(url, options = {}) {
-  if (supabaseClient && window.RITME_CONFIG?.apiMode !== 'server') return supabaseApi(url, options);
   const apiBaseUrl = String(window.RITME_CONFIG?.apiBaseUrl || '').replace(/\/$/, '');
   const requestUrl = apiBaseUrl ? `${apiBaseUrl}${url}` : url;
-  const headers = {};
-  if (supabaseClient) {
-    const { data, error } = await supabaseClient.auth.getSession();
-    if (error) throw new Error('Sesi login tidak dapat diverifikasi. Silakan masuk kembali.');
-    if (!data.session?.access_token) throw new Error('Sesi login berakhir. Silakan masuk kembali.');
-    headers.Authorization = `Bearer ${data.session.access_token}`;
-  }
+  if (!supabaseClient) throw new Error('Konfigurasi autentikasi belum tersedia. Muat ulang atau hubungi administrator.');
+  const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
+  if (sessionError) throw new Error('Sesi masuk tidak dapat diperiksa. Silakan masuk kembali.');
+  if (!sessionData.session?.access_token) throw new Error('Sesi masuk telah berakhir. Silakan masuk kembali.');
   let response;
   try {
     response = await fetch(requestUrl, {
       ...options,
       headers: {
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(options.method && options.method !== 'GET' && window.crypto?.randomUUID
-          ? { 'Idempotency-Key': crypto.randomUUID() }
-          : {}),
-        ...headers,
+        Authorization: `Bearer ${sessionData.session.access_token}`,
         ...options.headers
       }
     });
@@ -74,6 +75,10 @@ async function api(url, options = {}) {
     throw new Error('Server tidak dapat dihubungi. Pastikan aplikasi masih berjalan.');
   }
   const payload = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    await clearSession();
+    showLogin(payload.error || 'Sesi masuk telah berakhir. Silakan masuk kembali.');
+  }
   if (!response.ok) throw new Error(payload.error || `Permintaan gagal (${response.status}).`);
   return payload;
 }
@@ -251,6 +256,15 @@ function notify(message, isError = false) {
   notify.timer = window.setTimeout(() => toast.classList.remove('is-visible'), 3600);
 }
 
+async function clearSession() {
+  try {
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) console.error('Failed to clear Supabase session:', error.message);
+  } catch (error) {
+    console.error('Failed to clear Supabase session:', error.message || error);
+  }
+}
+
 function setBusy(form, busy) {
   const button = form.querySelector('[type="submit"]');
   button.disabled = busy;
@@ -258,11 +272,12 @@ function setBusy(form, busy) {
 }
 
 async function loadDashboard() {
-  const [summary, rentals] = await Promise.all([api('/api/dashboard'), api('/api/penyewaan/aktif')]);
-  state.rentals = rentals;
+  const summary = await api('/api/dashboard');
+  state.rentals = currentUser.role === 'akuntansi' ? [] : await api('/api/penyewaan/aktif');
   document.querySelector('#metric-active').textContent = summary.penyewaanBerlangsung;
   document.querySelector('#metric-due-soon').textContent = summary.penyewaanJatuhTempo;
   document.querySelector('#metric-late').textContent = summary.penyewaanTerlambat;
+  document.querySelector('#metric-available').textContent = summary.alatTersedia;
   renderDueTable();
   renderSellerFollowup();
   renderRentalOptions();
@@ -273,9 +288,7 @@ async function loadDashboard() {
 
 function renderDueTable() {
   const today = localDateValue();
-  const datedRentals = state.rentals
-    .map(rental => ({ rental, days: daysUntil(rental.tgl_rencana_kembali, today) }))
-    .sort((a, b) => a.days - b.days || a.rental.id_sewa - b.rental.id_sewa);
+  const datedRentals = state.rentals.map(rental => ({ rental, days: daysUntil(rental.tgl_rencana_kembali, today) }));
   document.querySelector('#count-rentals').textContent = datedRentals.length;
   document.querySelector('#count-due-soon').textContent = datedRentals.filter(({ days }) => days >= 0 && days <= 3).length;
   document.querySelector('#count-late').textContent = datedRentals.filter(({ days }) => days < 0).length;
@@ -286,21 +299,19 @@ function renderDueTable() {
   });
   const rows = filtered.slice(0, 8).map(({ rental, days }) => {
     const status = days < 0
-      ? { className: 'status-late', rowClass: 'is-overdue', label: `Terlambat ${Math.abs(days)} hari` }
+      ? { className: 'status-late', label: `Terlambat ${Math.abs(days)} hari` }
       : days === 0
-        ? { className: 'status-today', rowClass: 'is-due-today', label: 'Jatuh tempo hari ini' }
+        ? { className: 'status-due', label: 'Jatuh tempo hari ini' }
         : days <= 3
-          ? { className: 'status-due', rowClass: 'is-due-soon', label: `Dalam ${days} hari` }
-          : { className: 'status-active', rowClass: '', label: 'Berlangsung' };
-    return `<tr class="${status.rowClass}"><td><strong>${escapeHtml(rental.pelanggan?.nama || 'Pelanggan')}</strong><small>Sewa #${rental.id_sewa}</small></td><td>${formatDate(rental.tgl_rencana_kembali)}</td><td>${currency.format(Number(rental.total_biaya))}</td><td><span class="status-pill ${status.className}"><i></i>${status.label}</span></td></tr>`;
+          ? { className: 'status-due', label: `Dalam ${days} hari` }
+          : { className: 'status-active', label: 'Berlangsung' };
+    return `<tr><td><strong>${escapeHtml(rental.pelanggan?.nama || 'Pelanggan')}</strong><small>Sewa #${rental.id_sewa}</small></td><td>${formatDate(rental.tgl_rencana_kembali)}</td><td>${currency.format(Number(rental.total_biaya))}</td><td><span class="status-pill ${status.className}"><i></i>${status.label}</span></td></tr>`;
   }).join('');
   const emptyMessage = state.rentalFilter === 'all' ? 'Belum ada penyewaan aktif.' : 'Tidak ada pengembalian pada filter ini.';
   document.querySelector('#due-table').innerHTML = rows || `<tr><td colspan="4" class="empty-cell">${emptyMessage}</td></tr>`;
   document.querySelector('#due-caption').textContent = filtered.length > 8
-    ? `Menampilkan 8 dari ${filtered.length} rental, diurutkan berdasarkan tanggal terdekat. Kelola daftar lengkap melalui menu Transaksi.`
-    : state.rentalFilter === 'all'
-      ? 'Jadwal terdekat ditampilkan lebih dahulu. Pengingat mencakup hari ini hingga 3 hari ke depan.'
-      : 'Jadwal terdekat ditampilkan lebih dahulu.';
+    ? `Menampilkan 8 dari ${filtered.length} penyewaan. Kelola daftar lengkap melalui menu Transaksi.`
+    : 'Pengingat jatuh tempo mencakup hari ini hingga 3 hari ke depan.';
 }
 
 function renderSellerFollowup() {
@@ -347,7 +358,9 @@ function renderDashboardAccounting() {
   document.querySelector('#metric-month-revenue').textContent = currency.format(recognized);
   document.querySelector('#metric-month-cash').textContent = currency.format(cash);
   document.querySelector('#metric-receivables').textContent = currency.format(receivables);
-  document.querySelector('#metric-available').textContent = state.equipment.filter(row => row.status === 'Tersedia').length;
+  if (currentUser.role !== 'akuntansi') {
+    document.querySelector('#metric-available').textContent = state.equipment.filter(row => row.status === 'Tersedia').length;
+  }
 
   const monthLabel = new Intl.DateTimeFormat('id-ID', {
     timeZone: 'UTC', month: 'long', year: 'numeric'
@@ -437,6 +450,27 @@ async function loadDetailData() {
   renderDetailData();
   renderDashboardAccounting();
   renderIncomeReport();
+}
+
+async function loadAdminUsers() {
+  state.adminUsers = await api('/api/admin/users');
+  renderAdminUsers();
+}
+
+function renderAdminUsers() {
+  const body = document.querySelector('#admin-users-table');
+  if (!body) return;
+  body.innerHTML = state.adminUsers.map(user => `<tr data-user-id="${escapeHtml(user.id)}">
+    <td><strong>${escapeHtml(user.email)}</strong></td>
+    <td><select aria-label="Peran ${escapeHtml(user.email)}" data-user-role>
+      <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Administrator</option>
+      <option value="operasional" ${user.role === 'operasional' ? 'selected' : ''}>Operasional</option>
+      <option value="akuntansi" ${user.role === 'akuntansi' ? 'selected' : ''}>Akuntansi</option>
+    </select></td>
+    <td>${formatDate(String(user.created_at).slice(0, 10))}</td>
+    <td><div class="access-actions"><button class="record-edit-button" type="button" data-save-role>Simpan</button>
+      <button class="record-edit-button access-revoke" type="button" data-revoke-user>Cabut akses</button></div></td>
+  </tr>`).join('') || '<tr><td class="empty-cell" colspan="4">Belum ada pengguna dengan akses.</td></tr>';
 }
 
 function rentalDays() {
@@ -532,8 +566,6 @@ async function addEquipment() {
   const nameInput = document.querySelector('#equipment-name');
   const rateInput = document.querySelector('#equipment-rate');
   const fineInput = document.querySelector('#equipment-fine');
-  const button = document.querySelector('#save-equipment');
-  if (button.disabled) return;
   const nama_alat = nameInput.value.trim();
   const harga_sewa_per_hari = Number(rateInput.value);
   const denda_per_hari = Number(fineInput.value);
@@ -543,6 +575,7 @@ async function addEquipment() {
       !Number.isFinite(denda_per_hari) || denda_per_hari < 0) {
     return notify('Isi harga sewa dan denda dengan angka nol atau lebih.', true);
   }
+  const button = document.querySelector('#save-equipment');
   button.disabled = true;
   try {
     const equipment = await api('/api/alat-musik', {
@@ -875,6 +908,10 @@ function openRecordEditor(type, id) {
   const isCustomer = type === 'customer';
   const lockedRates = !isCustomer && equipment.status === 'Disewa';
   const dialog = document.querySelector('#record-editor');
+  if (dialog.open) {
+    if (dialog.dataset.recordType === type && dialog.dataset.recordId === String(id)) return;
+    dialog.close();
+  }
   const form = document.querySelector('#record-editor-form');
   const fields = document.querySelector('#record-editor-fields');
   dialog.dataset.recordType = type;
@@ -1219,7 +1256,17 @@ function renderJournals() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadCustomers(), loadEquipment(), loadDashboard(), loadUnpaid(), loadUnpaidRentals(), loadJournals(), loadDetailData()]);
+  const requests = [loadDashboard(), loadJournals(), loadDetailData()];
+  if (currentUser.role === 'admin') requests.push(loadAdminUsers());
+  if (currentUser.role !== 'akuntansi') {
+    requests.push(loadCustomers(), loadEquipment(), loadUnpaid(), loadUnpaidRentals());
+  } else {
+    state.customers = [];
+    state.equipment = [];
+    state.unpaid = [];
+    state.rentUnpaid = [];
+  }
+  await Promise.all(requests);
 }
 
 async function refreshFromButton() {
@@ -1238,9 +1285,33 @@ async function refreshFromButton() {
 }
 
 function showView(name) {
+  if (!roleViews[currentUser?.role]?.includes(name)) return;
   document.querySelectorAll('.view').forEach(view => view.classList.toggle('is-visible', view.id === `view-${name}`));
   document.querySelectorAll('.nav-link').forEach(link => link.classList.toggle('is-active', link.dataset.view === name));
   document.querySelector('#page-label').textContent = viewLabels[name] || 'Ringkasan';
+}
+
+function applyRoleUi() {
+  const allowedViews = roleViews[currentUser.role];
+  document.querySelectorAll('[data-view]').forEach(link => {
+    link.hidden = !allowedViews.includes(link.dataset.view);
+  });
+  document.querySelectorAll('.view').forEach(view => {
+    const name = view.id.replace('view-', '');
+    view.hidden = !allowedViews.includes(name);
+    view.classList.toggle('is-visible', name === 'dashboard');
+  });
+  document.querySelectorAll('[data-roles]').forEach(element => {
+    const roles = element.dataset.roles.split(',').map(role => role.trim());
+    element.hidden = !roles.includes(currentUser.role);
+  });
+  document.querySelectorAll('[data-hide-roles]').forEach(element => {
+    const roles = element.dataset.hideRoles.split(',').map(role => role.trim());
+    element.hidden = roles.includes(currentUser.role);
+  });
+  document.querySelector('#current-user').textContent = `${currentUser.email} · ${roleLabels[currentUser.role]}`;
+  document.querySelector('#page-label').textContent = 'Ringkasan';
+  document.querySelectorAll('.nav-link').forEach(link => link.classList.toggle('is-active', link.dataset.view === 'dashboard'));
 }
 
 function exportJournals() {
@@ -1265,7 +1336,7 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(link.href);
 }
 
-function initializeApplication() {
+function initializeApp() {
   const today = localDateValue();
   document.querySelector('#today-label').textContent = formatDate(today);
   document.querySelector('#current-month').textContent = new Intl.DateTimeFormat('id-ID', {
@@ -1325,6 +1396,65 @@ function initializeApplication() {
     fillRentPaymentAmount(button.dataset.rentPaymentAmount);
   }));
   document.querySelector('#download-csv').addEventListener('click', exportJournals);
+  document.querySelector('#sign-out').addEventListener('click', async () => {
+    try {
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) return notify('Gagal keluar. Silakan coba kembali.', true);
+      showLogin('Anda telah keluar dari Ritme.');
+    } catch (error) {
+      notify(`Gagal keluar: ${error.message}`, true);
+    }
+  });
+  document.querySelector('#admin-user-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (form.dataset.submitting === 'true') return;
+    form.dataset.submitting = 'true';
+    const button = form.querySelector('[type="submit"]');
+    button.disabled = true;
+    try {
+      const user = await api('/api/admin/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: document.querySelector('#admin-user-email').value,
+          role: document.querySelector('#admin-user-role').value
+        })
+      });
+      form.reset();
+      await loadAdminUsers();
+      notify(user.invited ? 'Undangan akses berhasil dikirim.' : 'Peran pengguna berhasil diperbarui.');
+    } catch (error) {
+      notify(error.message, true);
+    } finally {
+      form.dataset.submitting = 'false';
+      button.disabled = false;
+    }
+  });
+  document.querySelector('#admin-users-table').addEventListener('click', async event => {
+    const button = event.target.closest('[data-save-role], [data-revoke-user]');
+    if (!button) return;
+    const row = button.closest('tr');
+    const userId = row.dataset.userId;
+    button.disabled = true;
+    try {
+      if (button.hasAttribute('data-save-role')) {
+        await api(`/api/admin/users/${encodeURIComponent(userId)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ role: row.querySelector('[data-user-role]').value })
+        });
+        notify('Peran pengguna berhasil diperbarui.');
+      } else {
+        if (!window.confirm('Cabut akses pengguna ini ke Ritme?')) return;
+        await api(`/api/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+        notify('Akses pengguna berhasil dicabut.');
+      }
+      await loadAdminUsers();
+    } catch (error) {
+      notify(error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  });
   document.querySelector('#record-editor-form').addEventListener('submit', saveRecordEdit);
   document.querySelector('#record-editor-cancel').addEventListener('click', () => document.querySelector('#record-editor').close());
   document.querySelector('#record-editor-close').addEventListener('click', () => document.querySelector('#record-editor').close());
@@ -1344,6 +1474,7 @@ function initializeApplication() {
   document.querySelector('#toggle-customer-form').addEventListener('click', () => {
     const form = document.querySelector('#customer-create');
     form.hidden = !form.hidden;
+    document.querySelector('#toggle-customer-form').setAttribute('aria-expanded', String(!form.hidden));
     if (!form.hidden) document.querySelector('#customer-name').focus();
   });
 
@@ -1358,17 +1489,16 @@ function initializeApplication() {
   document.querySelector('#save-customer').addEventListener('click', async event => {
     const button = event.currentTarget;
     if (button.disabled) return;
-    if (!document.querySelector('#customer-name').value.trim()
-      || !document.querySelector('#customer-phone').value.trim()) {
-      return notify('Nama dan nomor HP pelanggan wajib diisi.', true);
-    }
+    const name = document.querySelector('#customer-name').value.trim();
+    const phone = document.querySelector('#customer-phone').value.trim();
+    if (!name || !phone) return notify('Nama dan nomor HP wajib diisi.', true);
     button.disabled = true;
     try {
       const customer = await api('/api/pelanggan', {
         method: 'POST',
         body: JSON.stringify({
-          nama: document.querySelector('#customer-name').value,
-          no_hp: document.querySelector('#customer-phone').value,
+          nama: name,
+          no_hp: phone,
           alamat: document.querySelector('#customer-address').value
         })
       });
@@ -1449,7 +1579,6 @@ function initializeApplication() {
     if (!selected || !Number.isFinite(amount) || amount <= 0) return notify('Pilih tagihan dan masukkan nominal cicilan yang valid.', true);
     if (amount > selected.sisa_denda) return notify('Jumlah pembayaran melebihi sisa denda.', true);
     const remaining = selected.sisa_denda - amount;
-    if (!window.confirm(`Catat pembayaran denda sebesar ${currency.format(amount)}?`)) return;
     form.dataset.submitting = 'true';
     setBusy(form, true);
     try {
@@ -1486,7 +1615,6 @@ function initializeApplication() {
     }
     if (amount > selected.sisa_tagihan) return notify('Jumlah pembayaran melebihi sisa tagihan sewa.', true);
     const remaining = selected.sisa_tagihan - amount;
-    if (!window.confirm(`Catat pembayaran sewa sebesar ${currency.format(amount)}?`)) return;
     form.dataset.submitting = 'true';
     setBusy(form, true);
     try {
@@ -1514,107 +1642,84 @@ function initializeApplication() {
   refreshAll().catch(error => notify(`Gagal memuat data: ${error.message}`, true));
 }
 
-function showAuthMessage(message, isSuccess = false) {
-  const element = document.querySelector('#auth-message');
-  element.textContent = message;
-  element.classList.toggle('is-success', isSuccess);
+function showLogin(message = '') {
+  document.querySelector('#app-shell').hidden = true;
+  document.querySelector('#login-screen').hidden = false;
+  document.querySelector('#login-message').textContent = message;
+  document.querySelector('#login-password').value = '';
+  currentUser = null;
 }
 
-async function enterApplication(session) {
-  const gate = document.querySelector('#auth-gate');
-  const appShell = document.querySelector('.app-shell');
-  const avatar = document.querySelector('#account-avatar');
-  const { data, error } = await supabaseClient.from('ritme_admins')
-    .select('user_id')
-    .eq('user_id', session.user.id)
-    .maybeSingle();
-
-  if (error) {
-    showAuthMessage('Akses belum dapat diverifikasi. Pastikan administrator sudah disiapkan di Supabase.');
-    return false;
-  }
-  if (!data || data.user_id !== session.user.id) {
-    await supabaseClient.auth.signOut();
-    showAuthMessage('Akun ini belum diberi akses administrator.');
-    return false;
-  }
-
-  gate.hidden = true;
-  appShell.hidden = false;
-  avatar.textContent = (session.user.email || 'AD').slice(0, 2).toUpperCase();
-  avatar.setAttribute('aria-label', session.user.email || 'Administrator');
-  showAuthMessage('', true);
+async function openAuthenticatedApp() {
+  const user = await api('/api/me');
+  if (!roleViews[user.role]) throw new Error('Akun ini belum diberi peran akses yang valid.');
+  currentUser = user;
+  applyRoleUi();
+  document.querySelector('#login-screen').hidden = true;
+  document.querySelector('#app-shell').hidden = false;
   if (!appInitialized) {
     appInitialized = true;
-    initializeApplication();
+    initializeApp();
   } else {
-    refreshAll().catch(error => notify(`Gagal memuat data: ${error.message}`, true));
+    await refreshAll();
   }
-  return true;
 }
 
-async function initializeAuthentication() {
-  const form = document.querySelector('#auth-form');
-  const button = document.querySelector('#auth-submit');
-  const appShell = document.querySelector('.app-shell');
-  if (!supabaseClient) {
-    showAuthMessage('Konfigurasi Supabase tidak tersedia. Aplikasi dikunci demi keamanan.');
-    return;
-  }
-
-  supabaseClient.auth.onAuthStateChange(event => {
-    if (event !== 'SIGNED_OUT') return;
-
-    appShell.hidden = true;
-    document.querySelector('#auth-gate').hidden = false;
-    document.querySelector('#auth-password').value = '';
-    showAuthMessage('Sesi login berakhir. Silakan masuk kembali.');
-  });
-
-  form.addEventListener('submit', async event => {
+async function startApplication() {
+  const loginForm = document.querySelector('#login-form');
+  loginForm.addEventListener('submit', async event => {
     event.preventDefault();
-    if (button.disabled) return;
+    if (!supabaseClient || loginForm.dataset.submitting === 'true') return;
+    loginForm.dataset.submitting = 'true';
+    const button = loginForm.querySelector('[type="submit"]');
     button.disabled = true;
-    showAuthMessage('Memeriksa akun...', true);
+    document.querySelector('#login-message').textContent = '';
     try {
-      const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email: document.querySelector('#auth-email').value.trim(),
-        password: document.querySelector('#auth-password').value
+      const { error } = await supabaseClient.auth.signInWithPassword({
+        email: document.querySelector('#login-email').value.trim(),
+        password: document.querySelector('#login-password').value
       });
-      if (error) throw error;
-      if (!data.session) throw new Error('Sesi login tidak berhasil dibuat.');
-      if (await enterApplication(data.session)) form.reset();
-    } catch (error) {
-      showAuthMessage(error.message || 'Login gagal. Periksa email dan kata sandi.');
+      if (error) {
+        showLogin('Email/kata sandi tidak cocok atau akun belum aktif.');
+      } else {
+        await openAuthenticatedApp();
+      }
+    } catch (loginError) {
+      await clearSession();
+      showLogin(loginError.message || 'Login gagal karena server tidak dapat dihubungi.');
     } finally {
+      loginForm.dataset.submitting = 'false';
       button.disabled = false;
     }
   });
 
-  document.querySelector('#logout-button').addEventListener('click', async event => {
-    const logoutButton = event.currentTarget;
-    logoutButton.disabled = true;
-    try {
-      const { error } = await supabaseClient.auth.signOut();
-      if (error) throw error;
-      appShell.hidden = true;
-      document.querySelector('#auth-gate').hidden = false;
-      document.querySelector('#auth-password').value = '';
-      showAuthMessage('Anda sudah keluar.', true);
-    } catch (error) {
-      notify(`Gagal keluar: ${error.message}`, true);
-    } finally {
-      logoutButton.disabled = false;
-    }
-  });
-
+  if (!supabaseClient) {
+    showLogin('Konfigurasi autentikasi belum tersedia. Periksa deployment GitHub Pages.');
+    return;
+  }
+  let data;
+  let error;
   try {
-    const { data, error } = await supabaseClient.auth.getSession();
-    if (error) throw error;
-    if (data.session) await enterApplication(data.session);
-  } catch (error) {
-    showAuthMessage(`Tidak dapat memeriksa sesi login: ${error.message}`);
+    ({ data, error } = await supabaseClient.auth.getSession());
+  } catch (sessionError) {
+    console.error('Failed to read Supabase session:', sessionError.message || sessionError);
+    showLogin('Sesi masuk tidak dapat diperiksa. Silakan muat ulang halaman.');
+    return;
+  }
+  if (error) {
+    showLogin('Sesi masuk tidak dapat diperiksa. Silakan coba kembali.');
+    return;
+  }
+  if (!data.session) {
+    showLogin();
+    return;
+  }
+  try {
+    await openAuthenticatedApp();
+  } catch (sessionError) {
+    await clearSession();
+    showLogin(sessionError.message);
   }
 }
 
-document.addEventListener('DOMContentLoaded', initializeAuthentication);
+document.addEventListener('DOMContentLoaded', startApplication);

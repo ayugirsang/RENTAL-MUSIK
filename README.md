@@ -144,7 +144,7 @@ Satu penyewaan dapat berisi beberapa alat melalui `detail_penyewaan`. Pengembali
 - **Hosting demo:** GitHub Pages
 - **Pemeriksaan otomatis:** GitHub Actions
 
-Di GitHub Pages, frontend mengakses Supabase langsung menggunakan publishable key yang disediakan melalui konfigurasi GitHub Actions. Pada mode server, aplikasi menggunakan Express sebagai API.
+GitHub Pages hanya menyajikan antarmuka. Semua data usaha diakses melalui API Express di Render setelah sesi Supabase Auth diverifikasi dan peran pengguna diperiksa. Publishable key hanya dipakai untuk proses login; service-role key tetap di server.
 
 ## Menjalankan secara lokal
 
@@ -168,17 +168,17 @@ Di GitHub Pages, frontend mengakses Supabase langsung menggunakan publishable ke
    npm install
    ```
 
-3. Buat file `.env` berdasarkan `.env.example`, lalu isi konfigurasi Supabase. Service-role key hanya untuk server lokal dan tidak boleh dipublikasikan:
+3. Buat file `.env` berdasarkan `.env.example`, lalu isi konfigurasi Supabase:
 
    ```env
    SUPABASE_URL=https://YOUR_PROJECT.supabase.co
    SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
    SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
-   API_ALLOWED_ORIGIN=http://localhost:3000
+   API_ALLOWED_ORIGINS=http://localhost:3000
    PORT=3000
    ```
 
-4. Untuk database baru, jalankan berurutan [`backend/schema.sql`](./backend/schema.sql), [`backend/triggers.sql`](./backend/triggers.sql), lalu [`backend/seed.sql`](./backend/seed.sql) melalui Supabase SQL Editor. File-file itu menyiapkan tabel dan RLS admin, fungsi bisnis serta trigger, lalu data awal alat musik.
+4. Untuk database baru, jalankan berurutan [`backend/schema.sql`](./backend/schema.sql), [`backend/triggers.sql`](./backend/triggers.sql), [`backend/seed.sql`](./backend/seed.sql), lalu [`backend/migrations/20261126_multi_role_access.sql`](./backend/migrations/20261126_multi_role_access.sql) melalui Supabase SQL Editor. Migrasi terakhir membuat daftar peran dan mencabut akses langsung `anon`/`authenticated` ke tabel usaha.
 
 5. Jalankan server dari root repository dan buka [http://localhost:3000](http://localhost:3000):
 
@@ -186,7 +186,21 @@ Di GitHub Pages, frontend mengakses Supabase langsung menggunakan publishable ke
    npm start
    ```
 
-Jika database sudah ada, jalankan [`backend/migrations/20261011_add_rental_payment_accounting.sql`](./backend/migrations/20261011_add_rental_payment_accounting.sql) **sekali** melalui Supabase SQL Editor sebelum menggunakan versi aplikasi ini. Migrasi menambahkan tabel pembayaran sewa dan kolom jurnal; rental lama ditandai **Belum Dicatat** agar histori yang tidak diketahui tidak diasumsikan sudah dibayar.
+Jika database sudah ada, buat backup terlebih dahulu. Jalankan migrasi yang memang belum diterapkan—termasuk [`backend/migrations/20261011_add_rental_payment_accounting.sql`](./backend/migrations/20261011_add_rental_payment_accounting.sql) dan migrasi instrumen bila dibutuhkan—kemudian jalankan [`backend/migrations/20261126_multi_role_access.sql`](./backend/migrations/20261126_multi_role_access.sql) **terakhir**. Migrasi keamanan menghapus kebijakan lama yang memberi akses anonim ke tabel usaha. Jangan jalankan ulang migrasi yang telah diterapkan.
+
+### Menyiapkan akun dan peran
+
+1. Pastikan **Email/Password** aktif di Supabase Auth.
+2. Buat akun administrator pertama melalui Supabase Dashboard → Authentication → Users.
+3. Ambil UUID pengguna tersebut, lalu jalankan SQL berikut di SQL Editor:
+
+   ```sql
+   insert into public.ritme_user_roles (user_id, role)
+   values ('UUID-PENGGUNA-ADMIN', 'admin');
+   ```
+
+4. Masuk ke aplikasi dengan akun tersebut. Administrator dapat mengundang pengguna dan memilih peran dari menu **Kelola akses**. Undangan email membutuhkan SMTP/email provider yang berfungsi.
+5. Peran **Operasional** dapat mengelola pelanggan, inventaris, rental, pengembalian, dan pembayaran. Peran **Akuntansi** hanya melihat ringkasan finansial, jurnal, buku besar, dan laporan. Hak akses juga diperiksa oleh API, bukan hanya disembunyikan di antarmuka.
 
 Untuk menambahkan delapan instrumen contoh ke database yang sudah pernah dibuat, jalankan sekali [`backend/migrations/20261008_add_more_instruments.sql`](./backend/migrations/20261008_add_more_instruments.sql) melalui Supabase SQL Editor. Migrasi tersebut tidak menggandakan alat dengan nama yang sama.
 
@@ -198,27 +212,15 @@ node --check frontend\js\app.js
 git diff --check
 ```
 
-## Keamanan dan akun admin
-
-Database hanya mengizinkan akun yang tercatat di `public.ritme_admins`. Untuk proyek baru, atau database lama yang masih memakai policy demo:
-
-1. Buat backup database, lalu jalankan [`backend/migrations/20261125_admin_auth_and_rls.sql`](./backend/migrations/20261125_admin_auth_and_rls.sql) sekali di Supabase SQL Editor setelah schema dan fungsi bisnis tersedia. Migration ini mencabut akses `anon` dan mewajibkan admin terautentikasi.
-2. Di Supabase Authentication, matikan pendaftaran pengguna publik dan buat akun pemilik/admin secara manual.
-3. Salin UUID akun dari daftar Authentication → Users, lalu daftarkan sebagai admin melalui SQL Editor:
-
-   ```sql
-   insert into public.ritme_admins (user_id)
-   values ('UUID-AKUN-ADMIN');
-   ```
-
-4. Tambahkan repository secrets `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY` melalui **Settings → Secrets and variables → Actions**.
-5. Pastikan GitHub Pages menggunakan source **GitHub Actions** di **Settings → Pages**, lalu push ke branch `main`.
-
-Jangan pernah menaruh service-role key di frontend, GitHub Pages secrets yang dirender ke artefak, atau repository. Akun yang tidak ada di `ritme_admins` tidak dapat membaca atau mengubah tabel aplikasi walaupun berhasil mendaftar/login.
-
 ## Deployment GitHub Pages
 
-Repository ini memiliki workflow **Deploy GitHub Pages**. Setelah Supabase Auth, migration keamanan, akun admin, dan dua repository secrets disiapkan, push ke branch `main`; workflow akan membangun konfigurasi frontend dan menerbitkan situs.
+Repository ini memiliki workflow **Deploy GitHub Pages**. Untuk menyiapkan deployment:
+
+1. Di Render, isi `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, dan `API_ALLOWED_ORIGINS=https://ayugirsang.github.io`. Jangan letakkan service-role key pada GitHub Pages.
+2. Tambahkan repository secrets `API_BASE_URL` (URL service Render), `SUPABASE_URL`, dan `SUPABASE_PUBLISHABLE_KEY` melalui **Settings → Secrets and variables → Actions**.
+3. Di Supabase Auth, atur Site URL/Redirect URLs ke `https://ayugirsang.github.io/RENTAL-MUSIK/` dan pastikan email undangan dikirim lewat SMTP yang terkonfigurasi.
+4. Pastikan GitHub Pages menggunakan source **GitHub Actions** di **Settings → Pages**.
+5. Push perubahan ke branch `main`; workflow akan membangun konfigurasi frontend dan menerbitkan situs.
 
 URL demo proyek: <https://ayugirsang.github.io/RENTAL-MUSIK/>.
 
@@ -233,7 +235,8 @@ RENTAL-MUSIK/
 │   ├── seed.sql                         Data contoh alat musik
 │   └── migrations/                      Perubahan skema untuk database yang sudah ada
 │       ├── 20261008_add_more_instruments.sql
-│       └── 20261011_add_rental_payment_accounting.sql
+│       ├── 20261011_add_rental_payment_accounting.sql
+│       └── 20261126_multi_role_access.sql
 ├── frontend/
 │   ├── index.html                       Halaman aplikasi rental musik
 │   ├── css/
@@ -260,8 +263,8 @@ RENTAL-MUSIK/
 
 Foto instrumen disimpan lokal di `frontend/img/instruments/` agar demo tidak perlu memuat gambar dari layanan eksternal. Foto selain cajon berasal dari [Unsplash](https://unsplash.com/license); foto cajon menggunakan gambar yang diberikan pengguna.
 
-## Batasan keamanan demo
+## Catatan keamanan
 
-Aplikasi ini belum menggunakan login. Kebijakan pada [`backend/schema.sql`](./backend/schema.sql) dan migrasi demo mengizinkan akses data melalui role Supabase `anon` agar aplikasi akademik dapat dicoba. Catatan pembayaran sewa hanya dapat dibaca dan ditambahkan dari aplikasi agar histori jurnalnya tidak dapat diubah atau dihapus melalui client. **Jangan gunakan konfigurasi ini untuk menyimpan data usaha nyata atau data sensitif.** Untuk penggunaan produksi, tambahkan autentikasi Supabase dan batasi Row Level Security (RLS) sesuai peran pengguna.
+Login menggunakan Supabase Auth; setiap permintaan API membawa access token dan diperiksa terhadap `ritme_user_roles`. Tabel usaha tidak dapat diakses langsung oleh role browser `anon` atau `authenticated`; hanya API server yang menggunakan service-role key. API membatasi origin browser, ukuran JSON, akses berbasis peran, dan mengembalikan pesan kesalahan database yang tidak membocorkan detail internal. Backup database tetap perlu diatur dan diuji secara berkala.
 
 Jangan pernah memasukkan `service_role` key atau file `.env` ke repository, frontend, maupun konfigurasi publik.

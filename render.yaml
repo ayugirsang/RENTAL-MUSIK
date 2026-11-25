@@ -7,13 +7,15 @@ services:
     startCommand: npm start
     autoDeploy: true
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      - key: API_ALLOWED_ORIGIN
+      - key: API_ALLOWED_ORIGINS
         sync: false
       - key: PORT
         value: 10000
