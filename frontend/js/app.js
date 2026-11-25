@@ -1558,6 +1558,15 @@ async function initializeAuthentication() {
     return;
   }
 
+  supabaseClient.auth.onAuthStateChange(event => {
+    if (event !== 'SIGNED_OUT') return;
+
+    appShell.hidden = true;
+    document.querySelector('#auth-gate').hidden = false;
+    document.querySelector('#auth-password').value = '';
+    showAuthMessage('Sesi login berakhir. Silakan masuk kembali.');
+  });
+
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (button.disabled) return;
