@@ -285,12 +285,21 @@ app.post('/api/penyewaan', async (req, res) => {
 
 app.post('/api/pengembalian', async (req, res) => {
   const { id_sewa, tgl_kembali_aktual } = req.body;
-  if (!isPositiveInteger(id_sewa) || !isValidDate(tgl_kembali_aktual)) {
-    return res.status(400).json({ error: 'Penyewaan dan tanggal kembali yang valid wajib dipilih.' });
+  const kondisi_alat = req.body.kondisi_alat || 'Baik';
+  const biaya_kerusakan = req.body.biaya_kerusakan === undefined ? 0 : Number(req.body.biaya_kerusakan);
+  const catatan_kerusakan = typeof req.body.catatan_kerusakan === 'string'
+    ? req.body.catatan_kerusakan.trim() || '-'
+    : '-';
+  if (!isPositiveInteger(id_sewa) || !isValidDate(tgl_kembali_aktual)
+    || !['Baik', 'Rusak Ringan', 'Rusak Berat', 'Hilang'].includes(kondisi_alat)
+    || !Number.isFinite(biaya_kerusakan) || biaya_kerusakan < 0
+    || (kondisi_alat === 'Baik' && biaya_kerusakan > 0)
+    || catatan_kerusakan.length > 1000) {
+    return res.status(400).json({ error: 'Pilih penyewaan dan tanggal kembali yang valid; kondisi dan biaya kerusakan harus sesuai.' });
   }
   const { data, error } = await supabase.from('pengembalian')
-    .insert({ id_sewa, tgl_kembali_aktual })
-    .select('id_pengembalian, id_sewa, hari_terlambat, total_denda, status_pembayaran_denda').single();
+    .insert({ id_sewa, tgl_kembali_aktual, kondisi_alat, biaya_kerusakan, catatan_kerusakan })
+    .select('id_pengembalian, id_sewa, hari_terlambat, total_denda, status_pembayaran_denda, kondisi_alat, biaya_kerusakan, catatan_kerusakan').single();
   if (error) return sendDatabaseError(res, error);
   res.status(201).json(data);
 });
@@ -387,7 +396,7 @@ app.get('/api/detail', async (_req, res) => {
     getAllRows('alat_musik', 'id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status', 'id_alat'),
     getAllRows('penyewaan', 'id_sewa, id_pelanggan, tgl_sewa, tgl_rencana_kembali, total_biaya, status_sewa, status_pembayaran_sewa, basis_pencatatan', 'id_sewa'),
     getAllRows('detail_penyewaan', 'id_detail, id_sewa, id_alat, jumlah, subtotal', 'id_detail'),
-    getAllRows('pengembalian', 'id_pengembalian, id_sewa, tgl_kembali_aktual, hari_terlambat, total_denda, status_pembayaran_denda', 'id_pengembalian'),
+    getAllRows('pengembalian', 'id_pengembalian, id_sewa, tgl_kembali_aktual, hari_terlambat, total_denda, status_pembayaran_denda, kondisi_alat, biaya_kerusakan, catatan_kerusakan', 'id_pengembalian'),
     getAllRows('pembayaran_denda', 'id_pembayaran, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran'),
     getAllRows('pembayaran_sewa', 'id_pembayaran_sewa, id_sewa, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran_sewa')
   ]);

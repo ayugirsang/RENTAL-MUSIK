@@ -486,12 +486,14 @@ input:focus, select:focus { box-shadow: 0 0 0 3px #2864e81a; }
 .chart-legend i { width: 8px; height: 8px; border-radius: 3px; }
 .legend-rent { background: #2864e8; }
 .legend-fine { background: #f0aa47; }
+.legend-damage { background: #44a58a; }
 .revenue-chart { display: grid; height: 178px; grid-template-columns: repeat(31, minmax(3px, 1fr)); align-items: stretch; gap: 4px; margin-top: 13px; border-bottom: 1px solid var(--line); }
 .chart-day { display: grid; min-width: 0; grid-template-rows: 1fr 17px; align-items: end; }
 .chart-column { display: flex; height: 100%; flex-direction: column; justify-content: flex-end; gap: 2px; }
 .chart-segment { display: block; min-height: 0; border-radius: 3px 3px 1px 1px; }
 .chart-segment-rent { height: var(--rent-height); background: linear-gradient(180deg, #5e8ef2, #2864e8); }
 .chart-segment-fine { height: var(--fine-height); background: linear-gradient(180deg, #ffd07d, #eda440); }
+.chart-segment-damage { height: var(--damage-height); background: linear-gradient(180deg, #70c4aa, #3e947a); }
 .chart-day-label { color: #8793a6; font: 9px var(--mono); text-align: center; }
 .monthly-income-summary { display: grid; gap: 0; margin: 14px 0; }
 .monthly-income-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; }
@@ -704,6 +706,9 @@ input:focus, select:focus { box-shadow: 0 0 0 3px #2864e81a; }
 .official-signatures i { width: 75%; height: 55px; border-bottom: 1px solid #303846; }
 .official-signatures strong { font-size: 10px; }
 .official-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 20px; padding-top: 7px; border-top: 1px solid #c5cad3; color: #5b6472; font-size: 9px; }
+.return-charge-summary { display: grid; gap: 6px; padding: 11px; border: 1px solid var(--line); border-radius: 8px; background: #f7f9fc; font-size: 11px; }
+.return-charge-summary div { display: flex; justify-content: space-between; gap: 12px; }
+.return-charge-summary div:last-child { padding-top: 6px; border-top: 1px solid var(--line); color: var(--ink); font-weight: 700; }
 @media print {
   @page { size: auto; margin: 4mm; }
   @page report-landscape { size: A4 landscape; margin: 12mm; }
@@ -714,14 +719,14 @@ input:focus, select:focus { box-shadow: 0 0 0 3px #2864e81a; }
     @bottom-right { content: "Halaman " counter(page) " dari " counter(pages); font: 9px Arial, sans-serif; }
   }
   body.printing-receipt { min-width: 0; margin: 0; background: #fff; }
-  body.printing-receipt > :not(#receipt-print-container) { display: none !important; }
-  body.printing-receipt #receipt-print-container { display: block !important; width: 100%; margin: 0; padding: 0; background: #fff; }
-  body.printing-receipt .receipt { width: 74mm; max-width: 100%; margin: 0 auto; padding: 0; color: #000; }
+  body.printing-receipt > :not(#printable-receipt-area) { display: none !important; }
+  body.printing-receipt #printable-receipt-area { display: block !important; width: 58mm; margin: 0; padding: 0; background: #fff; }
+  body.printing-receipt .receipt { width: 58mm; max-width: 100%; margin: 0 auto; padding: 0; color: #000; }
   body.printing-receipt .receipt * { color: #000 !important; box-shadow: none !important; }
   body.printing-document { min-width: 0; margin: 0; background: #fff; page: auto; }
   body.printing-document.print-landscape { page: report-landscape; }
-  body.printing-document > :not(#receipt-print-container) { display: none !important; }
-  body.printing-document #receipt-print-container { display: block !important; width: 100%; margin: 0; padding: 0; background: #fff; }
+  body.printing-document > :not(#printable-receipt-area) { display: none !important; }
+  body.printing-document #printable-receipt-area { display: block !important; width: 100%; margin: 0; padding: 0; background: #fff; }
   body.printing-document .official-document, body.printing-document .official-document * { color: #111 !important; box-shadow: none !important; }
   body.printing-document .official-table thead { display: table-header-group; }
   body.printing-document .official-table tr, body.printing-document .official-signatures { break-inside: avoid; }

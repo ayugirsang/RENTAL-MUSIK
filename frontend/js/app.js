@@ -169,7 +169,7 @@ async function supabaseApi(url, options = {}) {
     }
   } else if (url === '/api/pengembalian' && options.method === 'POST') {
     result = await supabaseClient.from('pengembalian').insert(body)
-      .select('id_pengembalian, id_sewa, hari_terlambat, total_denda, status_pembayaran_denda').single();
+      .select('id_pengembalian, id_sewa, hari_terlambat, total_denda, status_pembayaran_denda, kondisi_alat, biaya_kerusakan, catatan_kerusakan').single();
   } else if (url === '/api/pengembalian/belum-lunas') {
     const returns = await supabaseClient.from('pengembalian')
       .select('id_pengembalian, id_sewa, total_denda, status_pembayaran_denda')
@@ -206,7 +206,7 @@ async function supabaseApi(url, options = {}) {
       getAllSupabaseRows('alat_musik', 'id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status', 'id_alat'),
       getAllSupabaseRows('penyewaan', 'id_sewa, id_pelanggan, tgl_sewa, tgl_rencana_kembali, total_biaya, status_sewa, status_pembayaran_sewa, basis_pencatatan', 'id_sewa'),
       getAllSupabaseRows('detail_penyewaan', 'id_detail, id_sewa, id_alat, jumlah, subtotal', 'id_detail'),
-      getAllSupabaseRows('pengembalian', 'id_pengembalian, id_sewa, tgl_kembali_aktual, hari_terlambat, total_denda, status_pembayaran_denda', 'id_pengembalian'),
+      getAllSupabaseRows('pengembalian', 'id_pengembalian, id_sewa, tgl_kembali_aktual, hari_terlambat, total_denda, status_pembayaran_denda, kondisi_alat, biaya_kerusakan, catatan_kerusakan', 'id_pengembalian'),
       getAllSupabaseRows('pembayaran_denda', 'id_pembayaran, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran'),
       getAllSupabaseRows('pembayaran_sewa', 'id_pembayaran_sewa, id_sewa, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran_sewa')
     ]);
@@ -368,6 +368,7 @@ function renderDashboardAccounting() {
   const monthJournals = state.journals.filter(row => row.tgl_jurnal.startsWith(month));
   const rentRevenue = accountBalance(monthJournals.filter(row => row.kode_akun === '4100'), '4100');
   const fineRevenue = accountBalance(monthJournals.filter(row => row.kode_akun === '4110'), '4110');
+  const damageRevenue = accountBalance(monthJournals.filter(row => row.kode_akun === '4120'), '4120');
   const rentalPayments = state.detail?.rentalPayments || [];
   const finePayments = state.detail?.payments || [];
   const rentCash = rentalPayments
@@ -376,8 +377,9 @@ function renderDashboardAccounting() {
   const fineCash = finePayments
     .filter(row => row.tgl_bayar.startsWith(month))
     .reduce((sum, row) => sum + Number(row.jumlah_bayar), 0);
-  const receivables = accountBalance(state.journals, '1120') + accountBalance(state.journals, '1130');
-  const recognized = rentRevenue + fineRevenue;
+  const receivables = accountBalance(state.journals, '1120') + accountBalance(state.journals, '1130')
+    + accountBalance(state.journals, '1140');
+  const recognized = rentRevenue + fineRevenue + damageRevenue;
   const cash = rentCash + fineCash;
 
   document.querySelector('#metric-month-revenue').textContent = currency.format(recognized);
@@ -392,6 +394,7 @@ function renderDashboardAccounting() {
   document.querySelector('#monthly-income-summary').innerHTML = `
     <div class="monthly-income-row"><span>Pendapatan sewa</span><strong>${currency.format(rentRevenue)}</strong></div>
     <div class="monthly-income-row"><span>Pendapatan denda</span><strong>${currency.format(fineRevenue)}</strong></div>
+    <div class="monthly-income-row"><span>Pendapatan ganti rugi</span><strong>${currency.format(damageRevenue)}</strong></div>
     <div class="monthly-income-row total"><span>Total pendapatan diakui</span><strong>${currency.format(recognized)}</strong></div>
     <div class="monthly-income-row"><span>Kas sewa diterima</span><strong>${currency.format(rentCash)}</strong></div>
     <div class="monthly-income-row"><span>Kas denda diterima</span><strong>${currency.format(fineCash)}</strong></div>`;
@@ -400,21 +403,23 @@ function renderDashboardAccounting() {
   const dayCount = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
   const daily = new Map();
   for (const row of monthJournals) {
-    if (!['4100', '4110'].includes(row.kode_akun)) continue;
-    const values = daily.get(row.tgl_jurnal) || { rent: 0, fine: 0 };
-    values[row.kode_akun === '4100' ? 'rent' : 'fine'] += Number(row.kredit) - Number(row.debit);
+    if (!['4100', '4110', '4120'].includes(row.kode_akun)) continue;
+    const values = daily.get(row.tgl_jurnal) || { rent: 0, fine: 0, damage: 0 };
+    const type = row.kode_akun === '4100' ? 'rent' : row.kode_akun === '4110' ? 'fine' : 'damage';
+    values[type] += Number(row.kredit) - Number(row.debit);
     daily.set(row.tgl_jurnal, values);
   }
-  const maxRevenue = Math.max(0, ...[...daily.values()].map(value => value.rent + value.fine));
+  const maxRevenue = Math.max(0, ...[...daily.values()].map(value => value.rent + value.fine + value.damage));
   const bars = Array.from({ length: dayCount }, (_value, index) => {
     const day = index + 1;
     const date = `${month}-${String(day).padStart(2, '0')}`;
-    const values = daily.get(date) || { rent: 0, fine: 0 };
+    const values = daily.get(date) || { rent: 0, fine: 0, damage: 0 };
     const rentHeight = maxRevenue ? values.rent / maxRevenue * 100 : 0;
     const fineHeight = maxRevenue ? values.fine / maxRevenue * 100 : 0;
+    const damageHeight = maxRevenue ? values.damage / maxRevenue * 100 : 0;
     const label = day === 1 || day % 5 === 0 || day === dayCount ? day : '';
-    return `<div class="chart-day" title="${day} ${monthLabel}: sewa ${currency.format(values.rent)}, denda ${currency.format(values.fine)}">
-      <div class="chart-column"><span class="chart-segment chart-segment-rent" style="--rent-height:${rentHeight}%"></span><span class="chart-segment chart-segment-fine" style="--fine-height:${fineHeight}%"></span></div>
+    return `<div class="chart-day" title="${day} ${monthLabel}: sewa ${currency.format(values.rent)}, denda ${currency.format(values.fine)}, ganti rugi ${currency.format(values.damage)}">
+      <div class="chart-column"><span class="chart-segment chart-segment-rent" style="--rent-height:${rentHeight}%"></span><span class="chart-segment chart-segment-fine" style="--fine-height:${fineHeight}%"></span><span class="chart-segment chart-segment-damage" style="--damage-height:${damageHeight}%"></span></div>
       <span class="chart-day-label">${label}</span></div>`;
   }).join('');
   document.querySelector('#revenue-chart').innerHTML = bars;
@@ -622,13 +627,34 @@ function renderRentalOptions() {
 function updateFineEstimate() {
   const rental = state.rentals.find(item => String(item.id_sewa) === document.querySelector('#return-rental').value);
   const actual = document.querySelector('#actual-date').value;
-  if (!rental || !actual) {
-    document.querySelector('#fine-estimate').textContent = currency.format(0);
-    return;
+  const lateDays = rental && actual
+    ? Math.max(0, Math.round((new Date(`${actual}T00:00:00`) - new Date(`${rental.tgl_rencana_kembali}T00:00:00`)) / 86400000))
+    : 0;
+  const perDay = rental
+    ? (rental.detail_penyewaan || []).reduce((sum, detail) =>
+      sum + Number(detail.jumlah) * Number(detail.alat_musik?.denda_per_hari || 0), 0)
+    : 0;
+  const lateAmount = lateDays * perDay;
+  const damageAmount = document.querySelector('#return-condition').value === 'Baik'
+    ? 0
+    : Math.max(0, Number(document.querySelector('#damage-cost').value) || 0);
+  document.querySelector('#fine-estimate').textContent = currency.format(lateAmount);
+  document.querySelector('#return-late-charge').textContent = currency.format(lateAmount);
+  document.querySelector('#return-damage-charge').textContent = currency.format(damageAmount);
+  document.querySelector('#return-total-charge').textContent = currency.format(lateAmount + damageAmount);
+}
+
+function updateDamageInputState() {
+  const isGood = document.querySelector('#return-condition').value === 'Baik';
+  const costInput = document.querySelector('#damage-cost');
+  const noteInput = document.querySelector('#damage-note');
+  costInput.disabled = isGood;
+  noteInput.disabled = isGood;
+  if (isGood) {
+    costInput.value = '0';
+    noteInput.value = '';
   }
-  const lateDays = Math.max(0, Math.round((new Date(`${actual}T00:00:00`) - new Date(`${rental.tgl_rencana_kembali}T00:00:00`)) / 86400000));
-  const perDay = (rental.detail_penyewaan || []).reduce((sum, detail) => sum + Number(detail.jumlah) * Number(detail.alat_musik?.denda_per_hari || 0), 0);
-  document.querySelector('#fine-estimate').textContent = currency.format(lateDays * perDay);
+  updateFineEstimate();
 }
 
 function updatePaymentBalance() {
@@ -776,12 +802,15 @@ function requestConfirmation({ title, content, confirmLabel }) {
   });
 }
 
-function returnConfirmationContent(rental, actualDate) {
+function returnConfirmationContent(rental, actualDate, condition, damageCost, damageNote) {
   const plannedDays = Math.max(1, -daysUntil(rental.tgl_sewa, rental.tgl_rencana_kembali));
   const actualDays = Math.max(1, -daysUntil(rental.tgl_sewa, actualDate));
   const lateDays = Math.max(0, -daysUntil(rental.tgl_rencana_kembali, actualDate));
   const perDay = (rental.detail_penyewaan || []).reduce((sum, detail) =>
     sum + Number(detail.jumlah || 1) * Number(detail.alat_musik?.denda_per_hari || 0), 0);
+  const lateFee = lateDays * perDay;
+  const damageFee = condition === 'Baik' ? 0 : Number(damageCost || 0);
+  const totalCharges = lateFee + damageFee;
   const items = (rental.detail_penyewaan || []).map(detail =>
     `${detail.jumlah || 1} × ${detail.alat_musik?.nama_alat || 'Alat musik'}`).join(', ') || 'Rincian alat tidak tersedia';
   return `<dl class="confirmation-summary">
@@ -790,8 +819,12 @@ function returnConfirmationContent(rental, actualDate) {
     <div><dt>Durasi rencana / aktual</dt><dd>${plannedDays} / ${actualDays} hari</dd></div>
     <div><dt>Jatuh tempo / kembali</dt><dd>${formatDate(rental.tgl_rencana_kembali)} / ${formatDate(actualDate)}</dd></div>
     <div><dt>Keterlambatan</dt><dd>${lateDays} hari</dd></div>
-    <div><dt>Perkiraan denda</dt><dd>${currency.format(lateDays * perDay)} (${currency.format(perDay)} / hari)</dd></div>
-  </dl><p class="confirmation-warning">Tindakan ini akan mengembalikan ketersediaan stok alat dan mencatat piutang denda ke pembukuan.</p>`;
+    <div><dt>Denda keterlambatan</dt><dd>${currency.format(lateFee)} (${currency.format(perDay)} / hari)</dd></div>
+    <div><dt>Kondisi alat</dt><dd>${escapeHtml(condition)}</dd></div>
+    <div><dt>Biaya kerusakan</dt><dd>${currency.format(damageFee)}</dd></div>
+    <div><dt>Catatan</dt><dd>${escapeHtml(damageNote || '-')}</dd></div>
+    <div><dt>Total tagihan pengembalian</dt><dd>${currency.format(totalCharges)}</dd></div>
+  </dl><p class="confirmation-warning">Stok akan mengikuti kondisi alat. Denda keterlambatan dan biaya kerusakan dicatat terpisah; biaya kerusakan diakru ke piutang ganti rugi.</p>`;
 }
 
 function paymentConfirmationContent({ total, paid, amount, remaining, method, kind }) {
@@ -991,7 +1024,7 @@ function renderCustomerHistory() {
     <tbody>${rows || '<tr><td colspan="7" class="empty-cell">Pelanggan ini belum memiliki riwayat penyewaan.</td></tr>'}</tbody></table>`;
 }
 
-function printTransactionReceipt(type, id) {
+function getTransactionPrintData(type, id) {
   if (!state.detail) return notify('Data transaksi belum dimuat.', true);
   const { customers, rentals, returns, rentalDetails, equipment, paymentsByReturn, paidByReturn, rentalPaymentsByRental, paidByRental } = detailLookups();
   let rental;
@@ -1021,19 +1054,27 @@ function printTransactionReceipt(type, id) {
     }
     rental = rentals.get(returnRecord?.id_sewa);
   }
-  if (!rental) return notify('Data penyewaan untuk struk ini tidak ditemukan.', true);
+  if (!rental) {
+    notify('Data penyewaan untuk dokumen ini tidak ditemukan.', true);
+    return null;
+  }
 
   const customer = customers.get(rental.id_pelanggan);
   const details = rentalDetails.get(rental.id_sewa) || [];
-  const itemRows = details.map(detail => {
+  const items = details.map(detail => {
     const item = equipment.get(detail.id_alat);
-    const quantity = Number(detail.jumlah || 1);
-    const rate = Number(item?.harga_sewa_per_hari || 0);
-    const fineRate = Number(item?.denda_per_hari || 0);
-    return `<tr><td>${escapeHtml(item?.nama_alat || 'Alat musik')} × ${quantity}<small>Sewa ${currency.format(rate)} / hari · Denda ${currency.format(fineRate)} / hari</small></td><td class="receipt-number">${currency.format(Number(detail.subtotal || 0))}</td></tr>`;
-  }).join('');
+    return {
+      name: item?.nama_alat || 'Alat musik',
+      quantity: Number(detail.jumlah || 1),
+      dailyRate: Number(item?.harga_sewa_per_hari || 0),
+      amount: Number(detail.subtotal || 0)
+    };
+  });
   const isFine = paymentKind === 'fine' || type === 'return';
-  const total = isFine ? Number(returnRecord?.total_denda || 0) : Number(rental.total_biaya || 0);
+  const rentTotal = Number(rental.total_biaya || 0);
+  const lateFee = Number(returnRecord?.total_denda || 0);
+  const damageCost = Number(returnRecord?.biaya_kerusakan || 0);
+  const total = isFine ? lateFee + damageCost : rentTotal;
   let paid = isFine
     ? paidByReturn.get(returnRecord?.id_pengembalian) || 0
     : paidByRental.get(rental.id_sewa) || 0;
@@ -1043,67 +1084,51 @@ function printTransactionReceipt(type, id) {
     const currentIndex = paymentRows.findIndex(row => row[idField] === paymentId);
     paid = paymentRows.slice(0, currentIndex + 1).reduce((sum, row) => sum + Number(row.jumlah_bayar), 0);
   }
-  const amountNow = Number(currentPayment?.jumlah_bayar || 0);
   const balance = Math.max(0, total - paid);
-  const paymentStatus = total === 0 && isFine
-    ? 'Tidak ada denda'
-    : balance === 0 ? 'Lunas' : paid > 0 ? 'Sebagian' : 'Belum lunas';
-  const actualDays = Math.max(1, daysUntil(rental.tgl_sewa, rental.tgl_rencana_kembali) * -1);
   const date = currentPayment?.tgl_bayar || returnRecord?.tgl_kembali_aktual || rental.tgl_sewa;
-  const receiptDate = new Intl.DateTimeFormat('id-ID', {
-    timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short'
-  }).format(new Date());
-  const receiptType = type === 'return' ? 'BUKTI PENGEMBALIAN'
-    : isFine ? 'KUITANSI PEMBAYARAN DENDA' : type === 'rental' ? 'BUKTI PENYEWAAN' : 'KUITANSI PEMBAYARAN SEWA';
-  const business = window.RITME_BUSINESS_INFO || {};
-  const footerNote = 'Mohon simpan bukti transaksi ini. Pengembalian mengikuti tanggal dan ketentuan pada transaksi sewa.';
-  const paymentLines = [
-    `<div><span>Total ${isFine ? 'denda' : 'sewa'}</span><strong>${currency.format(total)}</strong></div>`,
-    `<div><span>Dibayar saat ini</span><strong>${currency.format(amountNow)}</strong></div>`,
-    `<div><span>Akumulasi dibayar</span><strong>${currency.format(paid)}</strong></div>`,
-    `<div><span>Metode</span><strong>${escapeHtml(currentPayment?.metode_bayar || '—')}</strong></div>`,
-    `<div><span>Status</span><strong>${escapeHtml(paymentStatus)}${balance ? ` · Sisa ${currency.format(balance)}` : ''}</strong></div>`
-  ].join('');
-  const fineLine = returnRecord
-    ? `<tr><td>Denda keterlambatan · ${Number(returnRecord.hari_terlambat)} hari</td><td class="receipt-number">${currency.format(Number(returnRecord.total_denda))}</td></tr>`
-    : '';
-  const container = document.querySelector('#receipt-print-container');
-  container.innerHTML = `<article class="receipt">
-    <header class="receipt-header"><strong>Ritme</strong><span>RENTAL MUSIK</span><h1>${receiptType}</h1></header>
-    <div class="receipt-meta"><span>No. transaksi</span><strong>${isFine ? `D-${returnRecord?.id_pengembalian}` : `S-${rental.id_sewa}`}</strong><span>Tanggal</span><strong>${formatDate(date)}</strong></div>
-    <section class="receipt-customer"><strong>${escapeHtml(customer?.nama || 'Pelanggan')}</strong><span>${escapeHtml(customer?.no_hp || 'Nomor HP tidak tersedia')}</span></section>
-    <table class="receipt-items"><thead><tr><th>RINCIAN</th><th class="receipt-number">JUMLAH</th></tr></thead>
-      <tbody>${itemRows || '<tr><td>Alat musik</td><td class="receipt-number">—</td></tr>'}${fineLine}</tbody></table>
-    <p class="receipt-duration">Durasi sewa rencana: ${actualDays} hari · Rencana kembali: ${formatDate(rental.tgl_rencana_kembali)}${returnRecord ? ` · Aktual: ${formatDate(returnRecord.tgl_kembali_aktual)}` : ''}</p>
-    <section class="receipt-payment">${paymentLines}</section>
-    <footer><p>${escapeHtml(business.address || 'Alamat usaha belum diatur')}</p><p>Kontak: ${escapeHtml(business.phone || 'Belum diatur')}</p><p>Dicetak ${escapeHtml(receiptDate)}</p><p>${footerNote}</p><strong>Terima kasih telah memilih Ritme.</strong></footer>
-  </article>`;
-  document.body.classList.add('printing-receipt');
-  container.hidden = false;
-  const cleanup = () => {
-    document.body.classList.remove('printing-receipt');
-    container.hidden = true;
-    window.removeEventListener('afterprint', cleanup);
+  const lateDays = Number(returnRecord?.hari_terlambat || 0);
+  return {
+    title: type === 'return' ? 'BUKTI PENGEMBALIAN'
+      : paymentKind === 'fine' ? 'KUITANSI PEMBAYARAN DENDA'
+        : type === 'rental' ? 'BUKTI PENYEWAAN' : 'KUITANSI PEMBAYARAN SEWA',
+    reference: type === 'rental' ? `S-${rental.id_sewa}`
+      : type === 'return' ? `BA-${returnRecord?.id_pengembalian}`
+        : paymentKind === 'fine' ? `KD-${currentPayment?.id_pembayaran}` : `KS-${currentPayment?.id_pembayaran_sewa}`,
+    rentalReference: `S-${rental.id_sewa}`,
+    date,
+    rentDate: rental.tgl_sewa,
+    dueDate: rental.tgl_rencana_kembali,
+    returnDate: returnRecord?.tgl_kembali_aktual,
+    durationDays: Math.max(1, -daysUntil(rental.tgl_sewa, rental.tgl_rencana_kembali)),
+    customer: { name: customer?.nama || 'Pelanggan', phone: customer?.no_hp || 'Nomor HP tidak tersedia' },
+    items,
+    rentTotal,
+    late: { days: lateDays, amount: lateFee, perDay: lateDays ? lateFee / lateDays : 0 },
+    damage: {
+      condition: returnRecord?.kondisi_alat || 'Baik',
+      cost: damageCost,
+      note: returnRecord?.catatan_kerusakan || '-'
+    },
+    payment: {
+      total,
+      amountNow: Number(currentPayment?.jumlah_bayar || 0),
+      paid,
+      balance,
+      method: currentPayment?.metode_bayar || '—',
+      status: balance === 0 ? 'LUNAS' : paid > 0 ? 'SEBAGIAN' : 'BELUM LUNAS'
+    },
+    signatures: type === 'rental',
+    business: window.RITME_BUSINESS_INFO || {}
   };
-  window.addEventListener('afterprint', cleanup);
-  window.print();
-  window.setTimeout(cleanup, 1000);
+}
+
+function printTransactionReceipt(type, id) {
+  const data = getTransactionPrintData(type, id);
+  if (data) window.RitmePrintReceipt.printThermal(data);
 }
 
 function printOfficialDocument(markup, landscape = false) {
-  const container = document.querySelector('#receipt-print-container');
-  container.innerHTML = markup;
-  document.body.classList.add('printing-document');
-  document.body.classList.toggle('print-landscape', landscape);
-  container.hidden = false;
-  const cleanup = () => {
-    document.body.classList.remove('printing-document', 'print-landscape');
-    container.hidden = true;
-    window.removeEventListener('afterprint', cleanup);
-  };
-  window.addEventListener('afterprint', cleanup);
-  window.print();
-  window.setTimeout(cleanup, 1000);
+  window.RitmePrintReceipt.printHtml(markup, landscape);
 }
 
 function formatOfficialDate(date) {
@@ -1132,113 +1157,9 @@ function officialDocumentFooter(signatures = false) {
     <footer class="official-footer"><span>Dicetak ${escapeHtml(printedAt)}</span><span>Ritme — Rental &amp; Studio Musik</span></footer>`;
 }
 
-function spellRupiah(amount) {
-  const words = ['nol', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
-  const spell = value => {
-    if (value < 12) return words[value];
-    if (value < 20) return `${spell(value - 10)} belas`;
-    if (value < 100) return `${spell(Math.floor(value / 10))} puluh${value % 10 ? ` ${spell(value % 10)}` : ''}`;
-    if (value < 200) return `seratus${value - 100 ? ` ${spell(value - 100)}` : ''}`;
-    if (value < 1000) return `${spell(Math.floor(value / 100))} ratus${value % 100 ? ` ${spell(value % 100)}` : ''}`;
-    if (value < 2000) return `seribu${value - 1000 ? ` ${spell(value - 1000)}` : ''}`;
-    if (value < 1000000) return `${spell(Math.floor(value / 1000))} ribu${value % 1000 ? ` ${spell(value % 1000)}` : ''}`;
-    if (value < 1000000000) return `${spell(Math.floor(value / 1000000))} juta${value % 1000000 ? ` ${spell(value % 1000000)}` : ''}`;
-    return `${spell(Math.floor(value / 1000000000))} miliar${value % 1000000000 ? ` ${spell(value % 1000000000)}` : ''}`;
-  };
-  const integer = Math.floor(Math.abs(Number(amount) || 0));
-  return `${integer ? spell(integer) : 'nol'} rupiah`;
-}
-
 function printTransactionDocument(type, id) {
-  if (!state.detail) return notify('Data transaksi belum dimuat.', true);
-  const { customers, equipment, rentals, returns, rentalDetails, paymentsByReturn, paidByReturn, rentalPaymentsByRental, paidByRental } = detailLookups();
-  let rental;
-  let returnRecord;
-  let currentPayment;
-  let paymentRows = [];
-  const isRentPayment = type === 'rental-payment';
-  const isFinePayment = type === 'fine-payment';
-  if (type === 'rental' || isRentPayment) {
-    currentPayment = isRentPayment
-      ? state.detail.rentalPayments.find(row => row.id_pembayaran_sewa === id)
-      : null;
-    rental = rentals.get(isRentPayment ? currentPayment?.id_sewa : id);
-    returnRecord = returns.get(rental?.id_sewa);
-    if (isRentPayment) paymentRows = [...(rentalPaymentsByRental.get(rental?.id_sewa) || [])]
-      .sort((a, b) => a.tgl_bayar.localeCompare(b.tgl_bayar) || a.id_pembayaran_sewa - b.id_pembayaran_sewa);
-  } else {
-    currentPayment = isFinePayment
-      ? state.detail.payments.find(row => row.id_pembayaran === id)
-      : null;
-    returnRecord = isFinePayment
-      ? state.detail.returns.find(row => row.id_pengembalian === currentPayment?.id_pengembalian)
-      : state.detail.returns.find(row => row.id_pengembalian === id);
-    rental = rentals.get(returnRecord?.id_sewa);
-    if (isFinePayment) paymentRows = [...(paymentsByReturn.get(returnRecord?.id_pengembalian) || [])]
-      .sort((a, b) => a.tgl_bayar.localeCompare(b.tgl_bayar) || a.id_pembayaran - b.id_pembayaran);
-  }
-  if (!rental) return notify('Data penyewaan untuk dokumen ini tidak ditemukan.', true);
-
-  const isFine = type === 'return' || isFinePayment;
-  const customer = customers.get(rental.id_pelanggan);
-  const details = rentalDetails.get(rental.id_sewa) || [];
-  const total = isFine ? Number(returnRecord?.total_denda || 0) : Number(rental.total_biaya || 0);
-  const accumulatedPaid = isFine
-    ? paidByReturn.get(returnRecord?.id_pengembalian) || 0
-    : paidByRental.get(rental.id_sewa) || 0;
-  const paidThroughReceipt = currentPayment
-    ? paymentRows.slice(0, paymentRows.findIndex(row => row.id_pembayaran === currentPayment.id_pembayaran
-      || row.id_pembayaran_sewa === currentPayment.id_pembayaran_sewa) + 1)
-      .reduce((sum, row) => sum + Number(row.jumlah_bayar), 0)
-    : accumulatedPaid;
-  const balance = Math.max(0, total - paidThroughReceipt);
-  const status = balance === 0 ? 'LUNAS' : paidThroughReceipt > 0 ? 'SEBAGIAN' : 'BELUM LUNAS';
-  const documentDate = currentPayment?.tgl_bayar || returnRecord?.tgl_kembali_aktual || rental.tgl_sewa;
-  const reference = type === 'rental' ? `S-${rental.id_sewa}`
-    : type === 'return' ? `BA-${returnRecord?.id_pengembalian}`
-      : isFinePayment ? `KD-${currentPayment?.id_pembayaran}` : `KS-${currentPayment?.id_pembayaran_sewa}`;
-  const title = type === 'rental' ? 'SURAT BUKTI SEWA'
-    : type === 'return' ? 'BERITA ACARA PENGEMBALIAN'
-      : isFinePayment ? 'KUITANSI PEMBAYARAN DENDA' : 'KUITANSI PEMBAYARAN SEWA';
-  const itemRows = details.map(detail => {
-    const item = equipment.get(detail.id_alat);
-    const quantity = Number(detail.jumlah || 1);
-    const rate = Number(item?.harga_sewa_per_hari || 0);
-    return `<tr><td>${escapeHtml(item?.nama_alat || 'Alat musik')} × ${quantity}</td><td>${currency.format(rate)}</td><td>${currency.format(Number(detail.subtotal || 0))}</td></tr>`;
-  }).join('');
-  const returnSummary = returnRecord
-    ? `<section class="official-section"><h3>Rincian pengembalian &amp; denda</h3><dl class="official-details">
-        <dt>Tanggal kembali aktual</dt><dd>${formatOfficialDate(returnRecord.tgl_kembali_aktual)}</dd>
-        <dt>Keterlambatan</dt><dd>${Number(returnRecord.hari_terlambat || 0)} hari</dd>
-        <dt>Total denda</dt><dd>${currency.format(Number(returnRecord.total_denda || 0))}</dd>
-        <dt>Kondisi alat</dt><dd>Periksa dan catat secara manual pada salinan ini: ____________________</dd>
-      </dl></section>`
-    : '';
-  const paymentSummary = `<section class="official-section"><h3>Ringkasan pembayaran</h3><dl class="official-details">
-      <dt>Total ${isFine ? 'denda' : 'sewa'}</dt><dd>${currency.format(total)}</dd>
-      <dt>${currentPayment ? 'Dibayar pada transaksi ini' : 'Pembayaran masuk tercatat'}</dt><dd>${currency.format(Number(currentPayment?.jumlah_bayar ?? accumulatedPaid))}</dd>
-      ${currentPayment ? `<dt>Terbilang</dt><dd>${escapeHtml(spellRupiah(currentPayment.jumlah_bayar))}</dd>` : ''}
-      <dt>Akumulasi dibayar</dt><dd>${currency.format(paidThroughReceipt)}</dd>
-      <dt>Metode pembayaran</dt><dd>${escapeHtml(currentPayment?.metode_bayar || (accumulatedPaid ? 'Lihat riwayat pembayaran' : 'Belum ada pembayaran'))}</dd>
-      <dt>Status</dt><dd><strong>${status}${balance ? ` · Sisa ${currency.format(balance)}` : ''}</strong></dd>
-    </dl></section>`;
-  const rentalTerms = type === 'rental'
-    ? '<section class="official-section"><h3>Syarat &amp; ketentuan</h3><p>Pelanggan bertanggung jawab menjaga alat selama masa sewa dan mengembalikannya sesuai tanggal yang disepakati. Keterlambatan dapat dikenakan denda sesuai tarif yang berlaku pada transaksi.</p></section>'
-    : '';
-  const customerBlock = `<section class="official-section"><h3>Identitas pelanggan</h3><dl class="official-details">
-      <dt>Nama</dt><dd>${escapeHtml(customer?.nama || 'Pelanggan')}</dd>
-      <dt>Nomor telepon</dt><dd>${escapeHtml(customer?.no_hp || 'Tidak tersedia')}</dd>
-      <dt>Nomor penyewaan</dt><dd>S-${rental.id_sewa}</dd>
-    </dl></section>`;
-  const rentalTermsLine = `<p class="official-note">Rencana kembali: <strong>${formatOfficialDate(rental.tgl_rencana_kembali)}</strong> · Tanggal sewa: ${formatOfficialDate(rental.tgl_sewa)}</p>`;
-  const content = `<article class="official-document">
-    ${officialDocumentHeader(title, reference, documentDate)}
-    ${customerBlock}
-    <section class="official-section"><h3>Rincian alat musik · Tarif per hari</h3><table class="official-table"><thead><tr><th>Nama alat</th><th>Tarif / hari</th><th>Subtotal sewa</th></tr></thead>
-      <tbody>${itemRows || '<tr><td colspan="3">Tidak ada rincian alat.</td></tr>'}</tbody></table>${rentalTermsLine}</section>
-    ${returnSummary}${paymentSummary}${rentalTerms}
-    ${officialDocumentFooter(type === 'rental')}</article>`;
-  printOfficialDocument(content);
+  const data = getTransactionPrintData(type, id);
+  if (data) window.RitmePrintReceipt.printOfficial(data);
 }
 
 function printLateNotice(rentalId) {
@@ -1466,17 +1387,20 @@ function getIncomeRows() {
   const months = new Map();
   const getMonth = date => {
     const key = date.slice(0, 7);
-    if (!months.has(key)) months.set(key, { month: key, rentRevenue: 0, fineRevenue: 0, rentCash: 0, fineCash: 0 });
+    if (!months.has(key)) months.set(key, {
+      month: key, rentRevenue: 0, fineRevenue: 0, damageRevenue: 0, rentCash: 0, fineCash: 0
+    });
     return months.get(key);
   };
   const included = date => (!start || date >= start) && (!end || date <= end);
 
   for (const row of state.journals) {
-    if (!included(row.tgl_jurnal) || !['4100', '4110'].includes(row.kode_akun)) continue;
+    if (!included(row.tgl_jurnal) || !['4100', '4110', '4120'].includes(row.kode_akun)) continue;
     const summary = getMonth(row.tgl_jurnal);
     const amount = Number(row.kredit) - Number(row.debit);
     if (row.kode_akun === '4100') summary.rentRevenue += amount;
-    else summary.fineRevenue += amount;
+    else if (row.kode_akun === '4110') summary.fineRevenue += amount;
+    else summary.damageRevenue += amount;
   }
   for (const payment of state.detail.rentalPayments) {
     if (included(payment.tgl_bayar)) getMonth(payment.tgl_bayar).rentCash += Number(payment.jumlah_bayar);
@@ -1502,14 +1426,16 @@ function renderIncomeReport() {
   const totals = months.reduce((result, row) => ({
     rentRevenue: result.rentRevenue + row.rentRevenue,
     fineRevenue: result.fineRevenue + row.fineRevenue,
+    damageRevenue: result.damageRevenue + row.damageRevenue,
     rentCash: result.rentCash + row.rentCash,
     fineCash: result.fineCash + row.fineCash
-  }), { rentRevenue: 0, fineRevenue: 0, rentCash: 0, fineCash: 0 });
-  const recognized = totals.rentRevenue + totals.fineRevenue;
+  }), { rentRevenue: 0, fineRevenue: 0, damageRevenue: 0, rentCash: 0, fineCash: 0 });
+  const recognized = totals.rentRevenue + totals.fineRevenue + totals.damageRevenue;
   const cash = totals.rentCash + totals.fineCash;
   metrics.innerHTML = `
     <article class="report-metric"><span>Pendapatan sewa diakui</span><strong>${currency.format(totals.rentRevenue)}</strong></article>
     <article class="report-metric"><span>Pendapatan denda diakui</span><strong>${currency.format(totals.fineRevenue)}</strong></article>
+    <article class="report-metric"><span>Pendapatan ganti rugi diakui</span><strong>${currency.format(totals.damageRevenue)}</strong></article>
     <article class="report-metric"><span>Total pendapatan diakui</span><strong>${currency.format(recognized)}</strong></article>
     <article class="report-metric"><span>Total kas diterima</span><strong>${currency.format(cash)}</strong></article>`;
   const monthRows = months.map(row => {
@@ -1519,13 +1445,14 @@ function renderIncomeReport() {
     return `<tr><td>${monthLabel}</td>
       <td class="amount-cell">${currency.format(row.rentRevenue)}</td>
       <td class="amount-cell">${currency.format(row.fineRevenue)}</td>
-      <td class="amount-cell"><strong>${currency.format(row.rentRevenue + row.fineRevenue)}</strong></td>
+      <td class="amount-cell">${currency.format(row.damageRevenue)}</td>
+      <td class="amount-cell"><strong>${currency.format(row.rentRevenue + row.fineRevenue + row.damageRevenue)}</strong></td>
       <td class="amount-cell">${currency.format(row.rentCash)}</td>
       <td class="amount-cell">${currency.format(row.fineCash)}</td>
       <td class="amount-cell"><strong>${currency.format(row.rentCash + row.fineCash)}</strong></td></tr>`;
   }).join('');
-  container.innerHTML = `<table class="income-table"><thead><tr><th>PERIODE</th><th class="amount-cell">PENDAPATAN SEWA</th><th class="amount-cell">PENDAPATAN DENDA</th><th class="amount-cell">TOTAL PENDAPATAN</th><th class="amount-cell">KAS SEWA</th><th class="amount-cell">KAS DENDA</th><th class="amount-cell">TOTAL KAS</th></tr></thead>
-    <tbody>${monthRows || '<tr><td colspan="7" class="empty-cell">Belum ada transaksi pendapatan pada periode ini.</td></tr>'}</tbody></table>
+  container.innerHTML = `<table class="income-table"><thead><tr><th>PERIODE</th><th class="amount-cell">PENDAPATAN SEWA</th><th class="amount-cell">PENDAPATAN DENDA</th><th class="amount-cell">PENDAPATAN GANTI RUGI</th><th class="amount-cell">TOTAL PENDAPATAN</th><th class="amount-cell">KAS SEWA</th><th class="amount-cell">KAS DENDA</th><th class="amount-cell">TOTAL KAS</th></tr></thead>
+    <tbody>${monthRows || '<tr><td colspan="8" class="empty-cell">Belum ada transaksi pendapatan pada periode ini.</td></tr>'}</tbody></table>
     <small class="field-hint">Pendapatan sewa tercatat saat rental baru dibuat (akrual). Pembayaran sewa untuk data lama yang belum direkonsiliasi dicatat sebagai pendapatan saat kas diterima. Kas sewa/denda hanya menunjukkan penerimaan yang tercatat.</small>`;
 }
 
@@ -1538,9 +1465,9 @@ function exportIncomeReport() {
     return notify(error.message, true);
   }
   if (!months.length) return notify('Tidak ada transaksi pendapatan pada periode ini.', true);
-  const header = ['Periode', 'Pendapatan sewa diakui', 'Pendapatan denda diakui', 'Total pendapatan diakui', 'Kas sewa diterima', 'Kas denda diterima', 'Total kas diterima'];
+  const header = ['Periode', 'Pendapatan sewa diakui', 'Pendapatan denda diakui', 'Pendapatan ganti rugi diakui', 'Total pendapatan diakui', 'Kas sewa diterima', 'Kas denda diterima', 'Total kas diterima'];
   const rows = months.map(row => [
-    row.month, row.rentRevenue, row.fineRevenue, row.rentRevenue + row.fineRevenue,
+    row.month, row.rentRevenue, row.fineRevenue, row.damageRevenue, row.rentRevenue + row.fineRevenue + row.damageRevenue,
     row.rentCash, row.fineCash, row.rentCash + row.fineCash
   ]);
   downloadCsv(`laporan-pendapatan-${document.querySelector('#income-start').value || 'awal'}-${document.querySelector('#income-end').value || 'akhir'}.csv`, [header, ...rows]);
@@ -1696,20 +1623,22 @@ function printIncomeReport() {
   const totals = months.reduce((result, row) => ({
     rentRevenue: result.rentRevenue + row.rentRevenue,
     fineRevenue: result.fineRevenue + row.fineRevenue,
+    damageRevenue: result.damageRevenue + row.damageRevenue,
     rentCash: result.rentCash + row.rentCash,
     fineCash: result.fineCash + row.fineCash
-  }), { rentRevenue: 0, fineRevenue: 0, rentCash: 0, fineCash: 0 });
+  }), { rentRevenue: 0, fineRevenue: 0, damageRevenue: 0, rentCash: 0, fineCash: 0 });
   const { paidByReturn, paidByRental } = detailLookups();
   const receivables = state.detail.rentals.reduce((sum, rental) =>
     sum + (rental.basis_pencatatan === 'Kas' ? 0
       : Math.max(0, Number(rental.total_biaya) - (paidByRental.get(rental.id_sewa) || 0))), 0)
     + state.detail.returns.reduce((sum, row) =>
-      sum + Math.max(0, Number(row.total_denda) - (paidByReturn.get(row.id_pengembalian) || 0)), 0);
+      sum + Math.max(0, Number(row.total_denda) - (paidByReturn.get(row.id_pengembalian) || 0))
+        + Number(row.biaya_kerusakan || 0), 0);
   const rows = months.map(row => {
     const monthLabel = new Intl.DateTimeFormat('id-ID', {
       timeZone: 'UTC', month: 'long', year: 'numeric'
     }).format(new Date(`${row.month}-01T00:00:00Z`));
-    return `<tr><td>${monthLabel}</td><td>${currency.format(row.rentRevenue)}</td><td>${currency.format(row.fineRevenue)}</td><td>${currency.format(row.rentRevenue + row.fineRevenue)}</td><td>${currency.format(row.rentCash + row.fineCash)}</td></tr>`;
+    return `<tr><td>${monthLabel}</td><td>${currency.format(row.rentRevenue)}</td><td>${currency.format(row.fineRevenue)}</td><td>${currency.format(row.damageRevenue)}</td><td>${currency.format(row.rentRevenue + row.fineRevenue + row.damageRevenue)}</td><td>${currency.format(row.rentCash + row.fineCash)}</td></tr>`;
   }).join('');
   const start = document.querySelector('#income-start').value;
   const end = document.querySelector('#income-end').value;
@@ -1719,12 +1648,14 @@ function printIncomeReport() {
     <section class="official-section"><h3>Ringkasan periode</h3><dl class="official-details">
       <dt>Pendapatan sewa (akrual)</dt><dd>${currency.format(totals.rentRevenue)}</dd>
       <dt>Pendapatan denda (akrual)</dt><dd>${currency.format(totals.fineRevenue)}</dd>
+      <dt>Pendapatan ganti rugi (akrual)</dt><dd>${currency.format(totals.damageRevenue)}</dd>
+      <dt>Total pendapatan (akrual)</dt><dd>${currency.format(totals.rentRevenue + totals.fineRevenue + totals.damageRevenue)}</dd>
       <dt>Kas riil diterima</dt><dd>${currency.format(totals.rentCash + totals.fineCash)}</dd>
       <dt>Piutang belum tertagih saat cetak</dt><dd>${currency.format(receivables)}</dd>
     </dl></section>
-    <section class="official-section"><h3>Rincian bulanan</h3><table class="official-table"><thead><tr><th>Periode</th><th>Pendapatan sewa</th><th>Pendapatan denda</th><th>Total pendapatan</th><th>Kas diterima</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="5">Tidak ada transaksi pada periode ini.</td></tr>'}
-      <tr class="official-total"><th>TOTAL</th><th>${currency.format(totals.rentRevenue)}</th><th>${currency.format(totals.fineRevenue)}</th><th>${currency.format(totals.rentRevenue + totals.fineRevenue)}</th><th>${currency.format(totals.rentCash + totals.fineCash)}</th></tr></tbody></table></section>
+    <section class="official-section"><h3>Rincian bulanan</h3><table class="official-table"><thead><tr><th>Periode</th><th>Pendapatan sewa</th><th>Pendapatan denda</th><th>Pendapatan ganti rugi</th><th>Total pendapatan</th><th>Kas diterima</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6">Tidak ada transaksi pada periode ini.</td></tr>'}
+      <tr class="official-total"><th>TOTAL</th><th>${currency.format(totals.rentRevenue)}</th><th>${currency.format(totals.fineRevenue)}</th><th>${currency.format(totals.damageRevenue)}</th><th>${currency.format(totals.rentRevenue + totals.fineRevenue + totals.damageRevenue)}</th><th>${currency.format(totals.rentCash + totals.fineCash)}</th></tr></tbody></table></section>
     ${officialDocumentFooter()}</article>`;
   printOfficialDocument(content, true);
 }
@@ -1843,11 +1774,14 @@ function initializeApplication() {
     updateFineEstimate();
   });
   document.querySelector('#actual-date').addEventListener('change', updateFineEstimate);
+  document.querySelector('#return-condition').addEventListener('change', updateDamageInputState);
+  document.querySelector('#damage-cost').addEventListener('input', updateFineEstimate);
   document.querySelector('#payment-return').addEventListener('change', updatePaymentBalance);
   document.querySelector('#payment-rental').addEventListener('change', updateRentPaymentBalance);
   document.querySelector('#history-return').addEventListener('change', renderPaymentHistory);
   document.querySelector('#history-rental').addEventListener('change', renderRentalPaymentHistory);
   document.querySelector('#history-customer').addEventListener('change', renderCustomerHistory);
+  updateDamageInputState();
   document.querySelector('#apply-report-filter').addEventListener('click', renderFinancialReport);
   document.querySelector('#apply-income-filter').addEventListener('click', renderIncomeReport);
   document.querySelector('#apply-ledger-filter').addEventListener('click', renderLedger);
@@ -1983,10 +1917,19 @@ function initializeApplication() {
     const rental = state.rentals.find(item => String(item.id_sewa) === document.querySelector('#return-rental').value);
     if (!rental) return notify('Pilih penyewaan aktif yang valid.', true);
     const actualDate = document.querySelector('#actual-date').value;
+    const condition = document.querySelector('#return-condition').value;
+    const damageCost = condition === 'Baik' ? 0 : Number(document.querySelector('#damage-cost').value);
+    const damageNote = document.querySelector('#damage-note').value.trim() || '-';
+    if (!Number.isFinite(damageCost) || damageCost < 0) {
+      return notify('Biaya kerusakan harus berupa angka nol atau lebih.', true);
+    }
+    if (condition !== 'Baik' && damageCost > 0 && damageNote === '-') {
+      return notify('Isi catatan kerusakan saat biaya ganti rugi dikenakan.', true);
+    }
     form.dataset.confirming = 'true';
     const confirmed = await requestConfirmation({
       title: 'Konfirmasi pengembalian',
-      content: returnConfirmationContent(rental, actualDate),
+      content: returnConfirmationContent(rental, actualDate, condition, damageCost, damageNote),
       confirmLabel: 'Ya, proses pengembalian'
     });
     form.dataset.confirming = 'false';
@@ -1996,13 +1939,16 @@ function initializeApplication() {
     try {
       const result = await api('/api/pengembalian', { method: 'POST', body: JSON.stringify({
         id_sewa: Number(document.querySelector('#return-rental').value),
-        tgl_kembali_aktual: document.querySelector('#actual-date').value
+        tgl_kembali_aktual: document.querySelector('#actual-date').value,
+        kondisi_alat: condition,
+        biaya_kerusakan: damageCost,
+        catatan_kerusakan: damageNote
       }) });
-      notify(result.hari_terlambat > 0
-        ? `Pengembalian dicatat. Denda ${currency.format(Number(result.total_denda))} untuk ${result.hari_terlambat} hari terlambat.`
-        : 'Pengembalian dicatat tanpa denda.');
+      const charges = `Denda terlambat ${currency.format(Number(result.total_denda))} · Kerusakan ${currency.format(Number(result.biaya_kerusakan))}`;
+      notify(`Pengembalian dicatat. ${charges}.`);
       form.reset();
       document.querySelector('#actual-date').value = today;
+      updateDamageInputState();
       await Promise.all([loadEquipment(), loadDashboard(), loadUnpaid(), loadJournals(), loadDetailData()]);
     } catch (error) {
       notify(error.message, true);
