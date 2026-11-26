@@ -341,12 +341,13 @@ function renderDueTable() {
         : days <= 3
             ? { className: 'status-due', rowClass: 'is-due-soon', label: days === 1 ? 'H-1' : `Dalam ${days} hari` }
           : { className: 'status-active', rowClass: '', label: 'Berlangsung' };
-    const needsReminder = days <= 3;
+    const needsReminder = days <= 1;
+    const reminderLink = needsReminder ? createWhatsAppReminder(rental, days) : '';
     const reminder = needsReminder
-        ? rental.pelanggan?.no_hp
-          ? `<a class="button button-outline button-small whatsapp-reminder" href="${createWhatsAppReminder(rental)}" target="_blank" rel="noopener noreferrer" aria-label="Kirim pengingat WhatsApp untuk Sewa #${rental.id_sewa}">WhatsApp</a>`
-          : '<span class="muted-dash">No. HP tidak tersedia</span>'
-        : '<span class="muted-dash">—</span>';
+      ? reminderLink
+        ? `<a class="button button-outline button-small whatsapp-reminder" href="${reminderLink}" target="_blank" rel="noopener noreferrer" aria-label="Kirim pengingat WhatsApp untuk Sewa #${rental.id_sewa}">Kirim WA</a>`
+        : '<span class="muted-dash">Nomor WhatsApp tidak valid</span>'
+      : '<span class="muted-dash">—</span>';
     const lateNotice = days < 0
       ? `<button class="record-edit-button" type="button" data-print-late-notice="${rental.id_sewa}">Cetak tagihan PDF</button>`
       : '';
@@ -361,22 +362,18 @@ function renderDueTable() {
       : 'Jadwal terdekat ditampilkan lebih dahulu.';
 }
 
-function createWhatsAppReminder(rental) {
-  const phone = String(rental.pelanggan?.no_hp || '').replace(/\D/g, '');
-  const internationalPhone = phone.startsWith('0') ? `62${phone.slice(1)}` : phone.startsWith('8') ? `62${phone}` : phone;
-  const items = (rental.detail_penyewaan || [])
-    .map(detail => `${detail.jumlah || 1} ${detail.alat_musik?.nama_alat || 'alat musik'}`)
-    .join(', ') || 'alat musik';
+function createWhatsAppReminder(rental, daysRemaining) {
   const finePerDay = (rental.detail_penyewaan || []).reduce((total, detail) =>
     total + Number(detail.jumlah || 1) * Number(detail.alat_musik?.denda_per_hari || 0), 0);
-  const days = daysUntil(rental.tgl_rencana_kembali);
-  const dueText = days < 0
-    ? `sudah terlambat ${Math.abs(days)} hari sejak ${formatDate(rental.tgl_rencana_kembali)}`
-    : days === 0
-      ? `jatuh tempo hari ini (${formatDate(rental.tgl_rencana_kembali)})`
-      : `jatuh tempo pada ${formatDate(rental.tgl_rencana_kembali)}`;
-  const message = `Halo ${rental.pelanggan?.nama || 'Pelanggan'}, pengingat penyewaan ${items} dari Ritme ${dueText}. Denda keterlambatan ${currency.format(finePerDay)} per hari. Mohon hubungi Ritme jika perlu bantuan. Terima kasih.`;
-  return `https://wa.me/${encodeURIComponent(internationalPhone)}?text=${encodeURIComponent(message)}`;
+  return window.RitmeWhatsAppReminders.createLink({
+    phone: rental.pelanggan?.no_hp,
+    customerName: rental.pelanggan?.nama,
+    itemNames: (rental.detail_penyewaan || []).map(detail =>
+      `${detail.jumlah || 1} ${detail.alat_musik?.nama_alat || 'alat musik'}`),
+    dueDate: formatDate(rental.tgl_rencana_kembali),
+    daysLate: Math.max(0, -daysRemaining),
+    finePerDay
+  });
 }
 
 function renderSellerFollowup() {

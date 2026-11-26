@@ -16,7 +16,8 @@
   <script src="js/notifications.js?v=feedback-v1" defer></script>
   <script src="js/print-receipt.js?v=damage-payments-v1" defer></script>
   <script src="js/report-printer.js?v=financial-print-v1" defer></script>
-  <script src="js/app.js?v=financial-print-v1" defer></script>
+  <script src="js/whatsapp-reminders.js?v=whatsapp-reminders-v1" defer></script>
+  <script src="js/app.js?v=whatsapp-reminders-v1" defer></script>
 </head>
 <body>
   <section class="auth-gate" id="auth-gate" aria-labelledby="auth-title">
@@ -158,7 +159,7 @@
                 <label class="field-label" for="return-rental">Penyewaan aktif <span class="required">*</span></label><select id="return-rental" required><option value="">Pilih penyewaan</option></select>
                 <div class="field-pair"><div><label class="field-label" for="actual-date">Tanggal kembali aktual</label><input id="actual-date" type="date" required></div><div class="fine-preview"><span>Perkiraan denda</span><strong id="fine-estimate">Rp0</strong></div></div>
                 <label class="field-label" for="return-condition">Kondisi alat saat dikembalikan</label>
-                <select id="return-condition"><option>Baik</option><option>Rusak Ringan</option><option>Rusak Berat</option><option>Hilang</option></select>
+                <select id="return-condition"><option value="Baik">Baik / Mulus</option><option>Rusak Ringan</option><option>Rusak Berat</option><option>Hilang</option></select>
                 <label class="field-label" for="damage-cost">Biaya kerusakan / kehilangan (Rp)</label>
                 <input id="damage-cost" type="number" min="0" step="1" inputmode="numeric" value="0" disabled>
                 <label class="field-label" for="damage-note">Catatan kerusakan</label>
