@@ -768,7 +768,9 @@ input:focus, select:focus { box-shadow: 0 0 0 3px #2864e81a; }
 .return-charge-summary div:last-child { padding-top: 6px; border-top: 1px solid var(--line); color: var(--ink); font-weight: 700; }
 @media print {
   @page { size: auto; margin: 4mm; }
+  @page receipt-80mm { size: 80mm auto; margin: 4mm; }
   @page report-landscape { size: A4 landscape; margin: 12mm; }
+  @page report-a5 { size: A5 portrait; margin: 8mm; }
   @page report-landscape {
     @bottom-right { content: "Halaman " counter(page) " dari " counter(pages); font: 9px Arial, sans-serif; }
   }
@@ -776,18 +778,25 @@ input:focus, select:focus { box-shadow: 0 0 0 3px #2864e81a; }
     @bottom-right { content: "Halaman " counter(page) " dari " counter(pages); font: 9px Arial, sans-serif; }
   }
   body.printing-receipt { min-width: 0; margin: 0; background: #fff; }
+  body.printing-receipt.print-80mm { page: receipt-80mm; }
   body.printing-receipt > :not(#printable-receipt-area) { display: none !important; }
   body.printing-receipt #printable-receipt-area { display: block !important; width: 58mm; margin: 0; padding: 0; background: #fff; }
   body.printing-receipt .receipt { width: 58mm; max-width: 100%; margin: 0 auto; padding: 0; color: #000; }
+  body.printing-receipt.print-80mm #printable-receipt-area,
+  body.printing-receipt.print-80mm .receipt { width: 80mm; }
   body.printing-receipt .receipt * { color: #000 !important; box-shadow: none !important; }
   body.printing-document { min-width: 0; margin: 0; background: #fff; page: auto; }
   body.printing-document.print-landscape { page: report-landscape; }
+  body.printing-document.print-a5 { page: report-a5; }
   body.printing-document > :not(#printable-receipt-area) { display: none !important; }
   body.printing-document #printable-receipt-area { display: block !important; width: 100%; margin: 0; padding: 0; background: #fff; }
   body.printing-document .official-document, body.printing-document .official-document * { color: #111 !important; box-shadow: none !important; }
   body.printing-document .official-table thead { display: table-header-group; }
   body.printing-document .official-table tr, body.printing-document .official-signatures { break-inside: avoid; }
   body.printing-document .official-table th { background: #edf1f7 !important; print-color-adjust: exact; }
+  body.printing-document .report-document .official-section { break-inside: auto; page-break-inside: auto; }
+  body.printing-document .report-document .official-table tr { break-inside: avoid; page-break-inside: avoid; }
+  body.printing-document .report-document .official-table { page-break-inside: auto; }
 }
 
 @media (max-width: 560px) {

@@ -38,16 +38,18 @@
     }).format(new Date(`${value}T00:00:00Z`));
   }
 
-  function printMarkup(markup, mode, landscape = false) {
+  function printMarkup(markup, mode, landscape = false, paper = 'A4') {
     const area = document.querySelector('#printable-receipt-area');
     if (!area) throw new Error('Kontainer cetak tidak ditemukan.');
     area.innerHTML = markup;
     document.body.classList.toggle('printing-receipt', mode === 'thermal');
     document.body.classList.toggle('printing-document', mode !== 'thermal');
     document.body.classList.toggle('print-landscape', landscape);
+    document.body.classList.toggle('print-80mm', mode === 'thermal' && paper === '80mm');
+    document.body.classList.toggle('print-a5', mode !== 'thermal' && paper === 'A5');
     area.hidden = false;
     const cleanup = () => {
-      document.body.classList.remove('printing-receipt', 'printing-document', 'print-landscape');
+      document.body.classList.remove('printing-receipt', 'printing-document', 'print-landscape', 'print-80mm', 'print-a5');
       area.hidden = true;
       global.removeEventListener('afterprint', cleanup);
     };
@@ -161,11 +163,11 @@
   }
 
   global.RitmePrintReceipt = Object.freeze({
-    printThermal(data) {
-      printMarkup(renderThermal(data), 'thermal');
+    printThermal(data, paper = '58mm') {
+      printMarkup(renderThermal(data), 'thermal', false, paper);
     },
-    printOfficial(data) {
-      printMarkup(renderOfficial(data), 'official');
+    printOfficial(data, paper = 'A4') {
+      printMarkup(renderOfficial(data), 'official', false, paper);
     },
     printHtml(markup, landscape = false) {
       printMarkup(markup, 'official', landscape);
