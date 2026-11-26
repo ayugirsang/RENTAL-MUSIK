@@ -278,12 +278,17 @@ async function getAllSupabaseRows(table, columns, orderColumn) {
 }
 
 function notify(message, isError = false) {
-  const toast = document.querySelector('#toast');
-  toast.textContent = message;
-  toast.classList.toggle('is-error', isError);
-  toast.classList.add('is-visible');
-  window.clearTimeout(notify.timer);
-  notify.timer = window.setTimeout(() => toast.classList.remove('is-visible'), 3600);
+  if (window.RitmeFeedback?.showToast) {
+    window.RitmeFeedback.showToast(message, isError ? 'error' : 'success');
+  } else {
+    const toast = document.querySelector('#toast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.toggle('is-error', isError);
+    toast.classList.add('is-visible');
+    window.clearTimeout(notify.timer);
+    notify.timer = window.setTimeout(() => toast.classList.remove('is-visible'), 3600);
+  }
 }
 
 function setBusy(form, busy) {
@@ -635,9 +640,9 @@ async function addEquipment() {
   const denda_per_hari = Number(fineInput.value);
   if (!nama_alat || nama_alat.length > 100) return notify('Nama alat wajib diisi (maksimal 100 karakter).', true);
   if (!rateInput.value.trim() || !fineInput.value.trim() ||
-      !Number.isFinite(harga_sewa_per_hari) || harga_sewa_per_hari < 0 ||
+      !Number.isFinite(harga_sewa_per_hari) || harga_sewa_per_hari <= 0 ||
       !Number.isFinite(denda_per_hari) || denda_per_hari < 0) {
-    return notify('Isi harga sewa dan denda dengan angka nol atau lebih.', true);
+    return notify('Tarif sewa harus lebih dari 0 dan denda harus berupa angka nol atau lebih.', true);
   }
   button.disabled = true;
   try {
@@ -1412,6 +1417,41 @@ function openRecordEditor(type, id) {
        ${lockedRates ? '<small class="field-hint">Tarif dikunci selama alat sedang disewa agar perhitungan transaksi berjalan tetap konsisten.</small>' : ''}`;
   dialog.showModal();
   fields.querySelector('input:not([readonly])')?.focus();
+  if (window.RitmeFeedback) {
+    if (isCustomer) {
+      window.RitmeFeedback.setupFieldValidation(
+        document.querySelector('#edit-customer-name'),
+        window.RitmeFeedback.validateCustomerName
+      );
+      window.RitmeFeedback.setupFieldValidation(
+        document.querySelector('#edit-customer-phone'),
+        window.RitmeFeedback.validatePhone
+      );
+      window.RitmeFeedback.setupFormValidation(form, [
+        { selector: '#edit-customer-name', validator: window.RitmeFeedback.validateCustomerName },
+        { selector: '#edit-customer-phone', validator: window.RitmeFeedback.validatePhone }
+      ]);
+    } else {
+      window.RitmeFeedback.setupFieldValidation(
+        document.querySelector('#edit-equipment-name'),
+        value => String(value || '').trim() ? '' : 'Nama alat musik wajib diisi.'
+      );
+      window.RitmeFeedback.setupFieldValidation(
+        document.querySelector('#edit-equipment-rate'),
+        window.RitmeFeedback.validatePositiveRate
+      );
+      window.RitmeFeedback.setupFieldValidation(
+        document.querySelector('#edit-equipment-fine'),
+        window.RitmeFeedback.validateFineRate
+      );
+      window.RitmeFeedback.setupFormValidation(form, [
+        { selector: '#edit-equipment-name', validator: value =>
+          String(value || '').trim() ? '' : 'Nama alat musik wajib diisi.' },
+        { selector: '#edit-equipment-rate', validator: window.RitmeFeedback.validatePositiveRate },
+        { selector: '#edit-equipment-fine', validator: window.RitmeFeedback.validateFineRate }
+      ]);
+    }
+  }
 }
 
 async function saveRecordEdit(event) {
@@ -1915,6 +1955,118 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(link.href);
 }
 
+function setupRealtimeFeedback() {
+  if (!window.RitmeFeedback) return;
+  const feedback = window.RitmeFeedback;
+
+  feedback.setupFieldValidation(document.querySelector('#customer-name'), feedback.validateCustomerName);
+  feedback.setupFieldValidation(document.querySelector('#customer-phone'), feedback.validatePhone);
+  feedback.setupFieldValidation(document.querySelector('#equipment-name'), value =>
+    String(value || '').trim() ? '' : 'Nama alat musik wajib diisi.');
+  feedback.setupFieldValidation(document.querySelector('#equipment-rate'), feedback.validatePositiveRate);
+  feedback.setupFieldValidation(document.querySelector('#equipment-fine'), feedback.validateFineRate);
+
+  const updateCustomerSaveButton = () => {
+    const name = document.querySelector('#customer-name');
+    const phone = document.querySelector('#customer-phone');
+    const button = document.querySelector('#save-customer');
+    button.disabled = Boolean(
+      feedback.validateCustomerName(name.value) ||
+      feedback.validatePhone(phone.value)
+    );
+  };
+  ['input', 'blur'].forEach(eventName => {
+    document.querySelector('#customer-name').addEventListener(eventName, updateCustomerSaveButton);
+    document.querySelector('#customer-phone').addEventListener(eventName, updateCustomerSaveButton);
+  });
+  updateCustomerSaveButton();
+
+  const updateEquipmentSaveButton = () => {
+    const name = document.querySelector('#equipment-name');
+    const rate = document.querySelector('#equipment-rate');
+    const fine = document.querySelector('#equipment-fine');
+    const button = document.querySelector('#save-equipment');
+    button.disabled = Boolean(
+      (String(name.value || '').trim() ? '' : 'Nama alat musik wajib diisi.') ||
+      feedback.validatePositiveRate(rate.value) ||
+      feedback.validateFineRate(fine.value)
+    );
+  };
+  ['input', 'blur'].forEach(eventName => {
+    document.querySelector('#equipment-name').addEventListener(eventName, updateEquipmentSaveButton);
+    document.querySelector('#equipment-rate').addEventListener(eventName, updateEquipmentSaveButton);
+    document.querySelector('#equipment-fine').addEventListener(eventName, updateEquipmentSaveButton);
+  });
+  updateEquipmentSaveButton();
+
+  const rentalStart = document.querySelector('#rental-date');
+  const rentalEnd = document.querySelector('#planned-date');
+  feedback.setupFieldValidation(rentalEnd, () => {
+    feedback.validateDatePair(rentalStart, rentalEnd);
+    return rentalEnd.classList.contains('is-invalid')
+      ? rentalEnd.nextElementSibling?.textContent || 'Tanggal rencana kembali tidak valid.'
+      : '';
+  });
+
+  feedback.setupFormValidation(document.querySelector('#rental-form'), [
+    { selector: '#rental-customer', validator: value => value ? '' : 'Pilih pelanggan.' },
+    { selector: '#rental-date', validator: value => value ? '' : 'Tanggal sewa wajib diisi.' },
+    { selector: '#planned-date', validator: value => {
+      feedback.validateDatePair(rentalStart, rentalEnd);
+      return rentalEnd.classList.contains('is-invalid')
+        ? rentalEnd.nextElementSibling?.textContent || 'Tanggal rencana kembali tidak valid.'
+        : '';
+    } }
+  ], () => document.querySelectorAll('#rental-form input[name="equipment"]:checked').length > 0);
+
+  feedback.setupFormValidation(document.querySelector('#payment-form'), [
+    { selector: '#payment-return', validator: value => value ? '' : 'Pilih tagihan denda.' },
+    { selector: '#payment-amount', validator: value => {
+      const input = document.querySelector('#payment-amount');
+      const selected = state.unpaid.find(item =>
+        String(item.id_pengembalian) === document.querySelector('#payment-return').value);
+      const maximum = selected?.sisa_denda || 0;
+      const amount = Number(value);
+      if (!value) return 'Nominal pembayaran wajib diisi.';
+      if (!Number.isFinite(amount) || amount <= 0) return 'Nominal pembayaran tidak boleh nol atau negatif.';
+      if (amount > maximum) return `Nominal bayar melebihi sisa tagihan (Maks. ${feedback.formatRupiah(maximum)}).`;
+      return '';
+    } }
+  ]);
+
+  feedback.setupFormValidation(document.querySelector('#damage-payment-form'), [
+    { selector: '#payment-damage-return', validator: value => value ? '' : 'Pilih tagihan kerusakan.' },
+    { selector: '#damage-payment-amount', validator: value => {
+      const selected = state.damageUnpaid.find(item =>
+        String(item.id_pengembalian) === document.querySelector('#payment-damage-return').value);
+      const maximum = selected?.sisa_kerusakan || 0;
+      const amount = Number(value);
+      if (!value) return 'Nominal pembayaran wajib diisi.';
+      if (!Number.isFinite(amount) || amount <= 0) return 'Nominal pembayaran tidak boleh nol atau negatif.';
+      if (amount > maximum) return `Nominal bayar melebihi sisa tagihan (Maks. ${feedback.formatRupiah(maximum)}).`;
+      return '';
+    } }
+  ]);
+
+  feedback.setupFormValidation(document.querySelector('#rent-payment-form'), [
+    { selector: '#payment-rental', validator: value => value ? '' : 'Pilih tagihan sewa.' },
+    { selector: '#rent-payment-amount', validator: value => {
+      const selected = state.rentUnpaid.find(item =>
+        String(item.id_sewa) === document.querySelector('#payment-rental').value);
+      const maximum = selected?.sisa_tagihan || 0;
+      const amount = Number(value);
+      if (!value) return 'Nominal pembayaran wajib diisi.';
+      if (!Number.isFinite(amount) || amount <= 0) return 'Nominal pembayaran tidak boleh nol atau negatif.';
+      if (amount > maximum) return `Nominal bayar melebihi sisa tagihan (Maks. ${feedback.formatRupiah(maximum)}).`;
+      return '';
+    } }
+  ]);
+
+  document.querySelector('#equipment-list')?.addEventListener('change', () => {
+    document.querySelector('#planned-date').dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
 function initializeApplication() {
   const today = localDateValue();
   document.querySelector('#today-label').textContent = formatDate(today);
@@ -1934,6 +2086,7 @@ function initializeApplication() {
   document.querySelector('#ledger-start').value = `${today.slice(0, 7)}-01`;
   document.querySelector('#ledger-end').value = today;
   syncDateLimits();
+  setupRealtimeFeedback();
 
   document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
   document.querySelectorAll('[data-go]').forEach(button => button.addEventListener('click', () => showView(button.dataset.go)));
@@ -2042,9 +2195,17 @@ function initializeApplication() {
   document.querySelector('#save-customer').addEventListener('click', async event => {
     const button = event.currentTarget;
     if (button.disabled) return;
-    if (!document.querySelector('#customer-name').value.trim()
-      || !document.querySelector('#customer-phone').value.trim()) {
-      return notify('Nama dan nomor HP pelanggan wajib diisi.', true);
+    const customerName = document.querySelector('#customer-name');
+    const customerPhone = document.querySelector('#customer-phone');
+    if (window.RitmeFeedback) {
+      const nameError = window.RitmeFeedback.validateCustomerName(customerName.value);
+      const phoneError = window.RitmeFeedback.validatePhone(customerPhone.value);
+      window.RitmeFeedback.setFieldError(customerName, nameError);
+      window.RitmeFeedback.setFieldError(customerPhone, phoneError);
+      if (nameError || phoneError) {
+        (nameError ? customerName : customerPhone).focus();
+        return notify(nameError || phoneError, true);
+      }
     }
     button.disabled = true;
     try {
@@ -2073,6 +2234,16 @@ function initializeApplication() {
     const form = event.currentTarget;
     if (form.dataset.submitting === 'true') return;
     const items = [...form.querySelectorAll('input[name="equipment"]:checked')].map(input => ({ id_alat: Number(input.value) }));
+    if (window.RitmeFeedback) {
+      const rentalStart = document.querySelector('#rental-date');
+      const rentalEnd = document.querySelector('#planned-date');
+      window.RitmeFeedback.validateDatePair(rentalStart, rentalEnd);
+      if (!items.length) {
+        window.RitmeFeedback.setFieldError(document.querySelector('#equipment-list'), 'Pilih minimal satu unit alat musik yang tersedia.');
+      } else {
+        window.RitmeFeedback.clearFieldError(document.querySelector('#equipment-list'));
+      }
+    }
     if (!items.length) return notify('Pilih minimal satu unit alat musik.', true);
     if (!window.confirm(`Buat penyewaan untuk ${items.length} alat? Pastikan pelanggan dan tanggal sudah benar.`)) return;
     form.dataset.submitting = 'true';

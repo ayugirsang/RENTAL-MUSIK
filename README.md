@@ -196,6 +196,8 @@ Di GitHub Pages, frontend mengakses Supabase langsung menggunakan publishable ke
 
 4. Untuk database baru, jalankan berurutan [`backend/schema.sql`](./backend/schema.sql), [`backend/triggers.sql`](./backend/triggers.sql), lalu [`backend/seed.sql`](./backend/seed.sql) melalui Supabase SQL Editor. File-file itu menyiapkan tabel dan RLS admin, fungsi bisnis serta trigger, lalu data awal alat musik.
 
+   Opsional untuk presentasi, jalankan [`backend/seed_demo_transactions.sql`](./backend/seed_demo_transactions.sql) setelah seluruh migrasi pembayaran dan kerusakan diterapkan. File tersebut menambahkan tujuh transaksi demo dari September-November 2026, tetapi melewati pelanggan atau transaksi yang sudah ada agar tidak menggandakan contoh.
+
 5. Jalankan server dari root repository dan buka [http://localhost:3000](http://localhost:3000):
 
    ```powershell
@@ -249,6 +251,7 @@ RENTAL-MUSIK/
 │   ├── schema.sql                       Tabel, relasi, indeks, dan kebijakan RLS Supabase
 │   ├── triggers.sql                     Validasi rental, pengembalian, pembayaran, dan jurnal
 │   ├── seed.sql                         Data contoh alat musik
+│   ├── seed_demo_transactions.sql       Tujuh transaksi demo September-November 2026
 │   └── migrations/                      Perubahan skema untuk database yang sudah ada
 │       ├── 20261008_add_more_instruments.sql
 │       └── 20261011_add_rental_payment_accounting.sql
