@@ -307,7 +307,10 @@ function renderDueTable() {
           ? `<a class="button button-outline button-small whatsapp-reminder" href="${createWhatsAppReminder(rental)}" target="_blank" rel="noopener noreferrer" aria-label="Kirim pengingat WhatsApp untuk Sewa #${rental.id_sewa}">WhatsApp</a>`
           : '<span class="muted-dash">No. HP tidak tersedia</span>'
         : '<span class="muted-dash">—</span>';
-    return `<tr class="${status.rowClass}"><td><strong>${escapeHtml(rental.pelanggan?.nama || 'Pelanggan')}</strong><small>Sewa #${rental.id_sewa}</small></td><td>${formatDate(rental.tgl_rencana_kembali)}</td><td>${currency.format(Number(rental.total_biaya))}</td><td><span class="status-pill ${status.className}"><i></i>${status.label}</span></td><td>${reminder}</td></tr>`;
+    const lateNotice = days < 0
+      ? `<button class="record-edit-button" type="button" data-print-late-notice="${rental.id_sewa}">Cetak tagihan PDF</button>`
+      : '';
+    return `<tr class="${status.rowClass}"><td><strong>${escapeHtml(rental.pelanggan?.nama || 'Pelanggan')}</strong><small>Sewa #${rental.id_sewa}</small></td><td>${formatDate(rental.tgl_rencana_kembali)}</td><td>${currency.format(Number(rental.total_biaya))}</td><td><span class="status-pill ${status.className}"><i></i>${status.label}</span></td><td class="receipt-actions">${reminder}${lateNotice}</td></tr>`;
   }).join('');
   const emptyMessage = state.rentalFilter === 'all' ? 'Belum ada penyewaan aktif.' : 'Tidak ada pengembalian pada filter ini.';
   document.querySelector('#due-table').innerHTML = rows || `<tr><td colspan="5" class="empty-cell">${emptyMessage}</td></tr>`;
@@ -912,13 +915,14 @@ function renderRentalPaymentHistory() {
   const rows = payments.map(payment => `<tr>
     <td>#${payment.id_pembayaran_sewa}</td><td>${formatDate(payment.tgl_bayar)}</td>
     <td>${escapeHtml(payment.metode_bayar)}</td><td class="amount-cell">${currency.format(Number(payment.jumlah_bayar))}</td>
-    <td><button class="record-edit-button" type="button" data-print-receipt="rental-payment" data-receipt-id="${payment.id_pembayaran_sewa}">Cetak struk</button></td>
+    <td class="receipt-actions"><button class="record-edit-button" type="button" data-print-receipt="rental-payment" data-receipt-id="${payment.id_pembayaran_sewa}">Cetak struk</button><button class="record-edit-button" type="button" data-print-pdf="rental-payment" data-receipt-id="${payment.id_pembayaran_sewa}">Unduh PDF</button></td>
   </tr>`).join('');
   const legacyNote = rental.basis_pencatatan === 'Kas'
     ? '<small class="field-hint">Tagihan ini berasal dari data sebelum fitur pembayaran sewa. Pembayaran yang dicatat mulai sekarang menggunakan basis kas.</small>'
     : '';
   container.innerHTML = `<div class="detail-balance">Total ${currency.format(Number(rental.total_biaya))} · Dibayar ${currency.format(paid)} · Sisa ${currency.format(balance)} · ${escapeHtml(rental.status_pembayaran_sewa)}
-    <button class="record-edit-button" type="button" data-print-receipt="rental" data-receipt-id="${rental.id_sewa}">Cetak struk rental</button></div>
+    <button class="record-edit-button" type="button" data-print-receipt="rental" data-receipt-id="${rental.id_sewa}">Cetak struk rental</button>
+    <button class="record-edit-button" type="button" data-print-pdf="rental" data-receipt-id="${rental.id_sewa}">Unduh bukti sewa PDF</button></div>
     ${legacyNote}<table><thead><tr><th>PEMBAYARAN</th><th>TANGGAL</th><th>METODE</th><th class="amount-cell">NOMINAL</th><th>BUKTI</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="5" class="empty-cell">Belum ada pembayaran untuk penyewaan ini.</td></tr>'}</tbody></table>`;
 }
@@ -939,10 +943,11 @@ function renderPaymentHistory() {
   const rows = payments.map(payment => `<tr>
     <td>#${payment.id_pembayaran}</td><td>${formatDate(payment.tgl_bayar)}</td>
     <td>${escapeHtml(payment.metode_bayar)}</td><td class="amount-cell">${currency.format(Number(payment.jumlah_bayar))}</td>
-    <td><button class="record-edit-button" type="button" data-print-receipt="fine-payment" data-receipt-id="${payment.id_pembayaran}">Cetak struk</button></td>
+    <td class="receipt-actions"><button class="record-edit-button" type="button" data-print-receipt="fine-payment" data-receipt-id="${payment.id_pembayaran}">Cetak struk</button><button class="record-edit-button" type="button" data-print-pdf="fine-payment" data-receipt-id="${payment.id_pembayaran}">Unduh PDF</button></td>
   </tr>`).join('');
   container.innerHTML = `<div class="detail-balance">Total ${currency.format(Number(bill.total_denda))} · Dibayar ${currency.format(paid)} · Sisa ${currency.format(balance)} · ${escapeHtml(bill.status_pembayaran_denda)}
-    <button class="record-edit-button" type="button" data-print-receipt="return" data-receipt-id="${bill.id_pengembalian}">Cetak struk denda</button></div>
+    <button class="record-edit-button" type="button" data-print-receipt="return" data-receipt-id="${bill.id_pengembalian}">Cetak struk denda</button>
+    <button class="record-edit-button" type="button" data-print-pdf="return" data-receipt-id="${bill.id_pengembalian}">Unduh berita acara PDF</button></div>
     <table><thead><tr><th>PEMBAYARAN</th><th>TANGGAL</th><th>METODE</th><th class="amount-cell">NOMINAL</th><th>BUKTI</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="5" class="empty-cell">Belum ada pembayaran untuk tagihan ini.</td></tr>'}</tbody></table>`;
 }
@@ -978,7 +983,8 @@ function renderCustomerHistory() {
         <td>${escapeHtml(rentStatus)}<small>Sisa ${currency.format(rentBalance)}</small></td>
         <td>${escapeHtml(fineStatus)}<small>${fine ? `${currency.format(paid)} / ${currency.format(fine)}` : ''}</small></td>
         <td class="receipt-actions"><button class="record-edit-button" type="button" data-print-receipt="rental" data-receipt-id="${rental.id_sewa}">Cetak rental</button>
-        ${rentalReturn ? `<button class="record-edit-button" type="button" data-print-receipt="return" data-receipt-id="${rentalReturn.id_pengembalian}">Cetak kembali</button>` : ''}</td></tr>`;
+        <button class="record-edit-button" type="button" data-print-pdf="rental" data-receipt-id="${rental.id_sewa}">Bukti sewa PDF</button>
+        ${rentalReturn ? `<button class="record-edit-button" type="button" data-print-receipt="return" data-receipt-id="${rentalReturn.id_pengembalian}">Cetak kembali</button><button class="record-edit-button" type="button" data-print-pdf="return" data-receipt-id="${rentalReturn.id_pengembalian}">Berita acara PDF</button>` : ''}</td></tr>`;
     }).join('');
   container.innerHTML = `<table><thead><tr><th>PENYEWAAN</th><th>ALAT</th><th>STATUS RENTAL</th><th class="amount-cell">BIAYA SEWA</th><th>STATUS PEMBAYARAN SEWA</th><th>STATUS DENDA</th><th>BUKTI</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="7" class="empty-cell">Pelanggan ini belum memiliki riwayat penyewaan.</td></tr>'}</tbody></table>`;
@@ -1081,6 +1087,189 @@ function printTransactionReceipt(type, id) {
   window.addEventListener('afterprint', cleanup);
   window.print();
   window.setTimeout(cleanup, 1000);
+}
+
+function printOfficialDocument(markup, landscape = false) {
+  const container = document.querySelector('#receipt-print-container');
+  container.innerHTML = markup;
+  document.body.classList.add('printing-document');
+  document.body.classList.toggle('print-landscape', landscape);
+  container.hidden = false;
+  const cleanup = () => {
+    document.body.classList.remove('printing-document', 'print-landscape');
+    container.hidden = true;
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  window.print();
+  window.setTimeout(cleanup, 1000);
+}
+
+function formatOfficialDate(date) {
+  return date
+    ? new Intl.DateTimeFormat('id-ID', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' })
+      .format(new Date(`${date}T00:00:00Z`))
+    : '—';
+}
+
+function officialDocumentHeader(title, reference, date) {
+  const business = window.RITME_BUSINESS_INFO || {};
+  return `<header class="official-header">
+    <div><h1>RITME — Rental &amp; Studio Musik</h1>
+      <p>${escapeHtml(business.address || 'Alamat usaha belum diatur')}</p>
+      <p>WhatsApp: ${escapeHtml(business.phone || 'Belum diatur')} · Email: ${escapeHtml(business.email || 'Belum diatur')}</p></div>
+    <div class="official-double-rule"></div><h2>${escapeHtml(title)}</h2>
+    <div class="official-meta"><span>Nomor dokumen</span><strong>${escapeHtml(reference)}</strong><span>Tanggal</span><strong>${formatOfficialDate(date)}</strong></div>
+  </header>`;
+}
+
+function officialDocumentFooter(signatures = false) {
+  const printedAt = new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta', dateStyle: 'long', timeStyle: 'short'
+  }).format(new Date());
+  return `${signatures ? `<section class="official-signatures"><div><span>Penyewa / Pelanggan</span><i></i><strong>Nama &amp; tanda tangan</strong></div><div><span>Petugas / Kasir Ritme</span><i></i><strong>Nama &amp; tanda tangan</strong></div></section>` : ''}
+    <footer class="official-footer"><span>Dicetak ${escapeHtml(printedAt)}</span><span>Ritme — Rental &amp; Studio Musik</span></footer>`;
+}
+
+function spellRupiah(amount) {
+  const words = ['nol', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
+  const spell = value => {
+    if (value < 12) return words[value];
+    if (value < 20) return `${spell(value - 10)} belas`;
+    if (value < 100) return `${spell(Math.floor(value / 10))} puluh${value % 10 ? ` ${spell(value % 10)}` : ''}`;
+    if (value < 200) return `seratus${value - 100 ? ` ${spell(value - 100)}` : ''}`;
+    if (value < 1000) return `${spell(Math.floor(value / 100))} ratus${value % 100 ? ` ${spell(value % 100)}` : ''}`;
+    if (value < 2000) return `seribu${value - 1000 ? ` ${spell(value - 1000)}` : ''}`;
+    if (value < 1000000) return `${spell(Math.floor(value / 1000))} ribu${value % 1000 ? ` ${spell(value % 1000)}` : ''}`;
+    if (value < 1000000000) return `${spell(Math.floor(value / 1000000))} juta${value % 1000000 ? ` ${spell(value % 1000000)}` : ''}`;
+    return `${spell(Math.floor(value / 1000000000))} miliar${value % 1000000000 ? ` ${spell(value % 1000000000)}` : ''}`;
+  };
+  const integer = Math.floor(Math.abs(Number(amount) || 0));
+  return `${integer ? spell(integer) : 'nol'} rupiah`;
+}
+
+function printTransactionDocument(type, id) {
+  if (!state.detail) return notify('Data transaksi belum dimuat.', true);
+  const { customers, equipment, rentals, returns, rentalDetails, paymentsByReturn, paidByReturn, rentalPaymentsByRental, paidByRental } = detailLookups();
+  let rental;
+  let returnRecord;
+  let currentPayment;
+  let paymentRows = [];
+  const isRentPayment = type === 'rental-payment';
+  const isFinePayment = type === 'fine-payment';
+  if (type === 'rental' || isRentPayment) {
+    currentPayment = isRentPayment
+      ? state.detail.rentalPayments.find(row => row.id_pembayaran_sewa === id)
+      : null;
+    rental = rentals.get(isRentPayment ? currentPayment?.id_sewa : id);
+    returnRecord = returns.get(rental?.id_sewa);
+    if (isRentPayment) paymentRows = [...(rentalPaymentsByRental.get(rental?.id_sewa) || [])]
+      .sort((a, b) => a.tgl_bayar.localeCompare(b.tgl_bayar) || a.id_pembayaran_sewa - b.id_pembayaran_sewa);
+  } else {
+    currentPayment = isFinePayment
+      ? state.detail.payments.find(row => row.id_pembayaran === id)
+      : null;
+    returnRecord = isFinePayment
+      ? state.detail.returns.find(row => row.id_pengembalian === currentPayment?.id_pengembalian)
+      : state.detail.returns.find(row => row.id_pengembalian === id);
+    rental = rentals.get(returnRecord?.id_sewa);
+    if (isFinePayment) paymentRows = [...(paymentsByReturn.get(returnRecord?.id_pengembalian) || [])]
+      .sort((a, b) => a.tgl_bayar.localeCompare(b.tgl_bayar) || a.id_pembayaran - b.id_pembayaran);
+  }
+  if (!rental) return notify('Data penyewaan untuk dokumen ini tidak ditemukan.', true);
+
+  const isFine = type === 'return' || isFinePayment;
+  const customer = customers.get(rental.id_pelanggan);
+  const details = rentalDetails.get(rental.id_sewa) || [];
+  const total = isFine ? Number(returnRecord?.total_denda || 0) : Number(rental.total_biaya || 0);
+  const accumulatedPaid = isFine
+    ? paidByReturn.get(returnRecord?.id_pengembalian) || 0
+    : paidByRental.get(rental.id_sewa) || 0;
+  const paidThroughReceipt = currentPayment
+    ? paymentRows.slice(0, paymentRows.findIndex(row => row.id_pembayaran === currentPayment.id_pembayaran
+      || row.id_pembayaran_sewa === currentPayment.id_pembayaran_sewa) + 1)
+      .reduce((sum, row) => sum + Number(row.jumlah_bayar), 0)
+    : accumulatedPaid;
+  const balance = Math.max(0, total - paidThroughReceipt);
+  const status = balance === 0 ? 'LUNAS' : paidThroughReceipt > 0 ? 'SEBAGIAN' : 'BELUM LUNAS';
+  const documentDate = currentPayment?.tgl_bayar || returnRecord?.tgl_kembali_aktual || rental.tgl_sewa;
+  const reference = type === 'rental' ? `S-${rental.id_sewa}`
+    : type === 'return' ? `BA-${returnRecord?.id_pengembalian}`
+      : isFinePayment ? `KD-${currentPayment?.id_pembayaran}` : `KS-${currentPayment?.id_pembayaran_sewa}`;
+  const title = type === 'rental' ? 'SURAT BUKTI SEWA'
+    : type === 'return' ? 'BERITA ACARA PENGEMBALIAN'
+      : isFinePayment ? 'KUITANSI PEMBAYARAN DENDA' : 'KUITANSI PEMBAYARAN SEWA';
+  const itemRows = details.map(detail => {
+    const item = equipment.get(detail.id_alat);
+    const quantity = Number(detail.jumlah || 1);
+    const rate = Number(item?.harga_sewa_per_hari || 0);
+    return `<tr><td>${escapeHtml(item?.nama_alat || 'Alat musik')} × ${quantity}</td><td>${currency.format(rate)}</td><td>${currency.format(Number(detail.subtotal || 0))}</td></tr>`;
+  }).join('');
+  const returnSummary = returnRecord
+    ? `<section class="official-section"><h3>Rincian pengembalian &amp; denda</h3><dl class="official-details">
+        <dt>Tanggal kembali aktual</dt><dd>${formatOfficialDate(returnRecord.tgl_kembali_aktual)}</dd>
+        <dt>Keterlambatan</dt><dd>${Number(returnRecord.hari_terlambat || 0)} hari</dd>
+        <dt>Total denda</dt><dd>${currency.format(Number(returnRecord.total_denda || 0))}</dd>
+        <dt>Kondisi alat</dt><dd>Periksa dan catat secara manual pada salinan ini: ____________________</dd>
+      </dl></section>`
+    : '';
+  const paymentSummary = `<section class="official-section"><h3>Ringkasan pembayaran</h3><dl class="official-details">
+      <dt>Total ${isFine ? 'denda' : 'sewa'}</dt><dd>${currency.format(total)}</dd>
+      <dt>${currentPayment ? 'Dibayar pada transaksi ini' : 'Pembayaran masuk tercatat'}</dt><dd>${currency.format(Number(currentPayment?.jumlah_bayar ?? accumulatedPaid))}</dd>
+      ${currentPayment ? `<dt>Terbilang</dt><dd>${escapeHtml(spellRupiah(currentPayment.jumlah_bayar))}</dd>` : ''}
+      <dt>Akumulasi dibayar</dt><dd>${currency.format(paidThroughReceipt)}</dd>
+      <dt>Metode pembayaran</dt><dd>${escapeHtml(currentPayment?.metode_bayar || (accumulatedPaid ? 'Lihat riwayat pembayaran' : 'Belum ada pembayaran'))}</dd>
+      <dt>Status</dt><dd><strong>${status}${balance ? ` · Sisa ${currency.format(balance)}` : ''}</strong></dd>
+    </dl></section>`;
+  const rentalTerms = type === 'rental'
+    ? '<section class="official-section"><h3>Syarat &amp; ketentuan</h3><p>Pelanggan bertanggung jawab menjaga alat selama masa sewa dan mengembalikannya sesuai tanggal yang disepakati. Keterlambatan dapat dikenakan denda sesuai tarif yang berlaku pada transaksi.</p></section>'
+    : '';
+  const customerBlock = `<section class="official-section"><h3>Identitas pelanggan</h3><dl class="official-details">
+      <dt>Nama</dt><dd>${escapeHtml(customer?.nama || 'Pelanggan')}</dd>
+      <dt>Nomor telepon</dt><dd>${escapeHtml(customer?.no_hp || 'Tidak tersedia')}</dd>
+      <dt>Nomor penyewaan</dt><dd>S-${rental.id_sewa}</dd>
+    </dl></section>`;
+  const rentalTermsLine = `<p class="official-note">Rencana kembali: <strong>${formatOfficialDate(rental.tgl_rencana_kembali)}</strong> · Tanggal sewa: ${formatOfficialDate(rental.tgl_sewa)}</p>`;
+  const content = `<article class="official-document">
+    ${officialDocumentHeader(title, reference, documentDate)}
+    ${customerBlock}
+    <section class="official-section"><h3>Rincian alat musik · Tarif per hari</h3><table class="official-table"><thead><tr><th>Nama alat</th><th>Tarif / hari</th><th>Subtotal sewa</th></tr></thead>
+      <tbody>${itemRows || '<tr><td colspan="3">Tidak ada rincian alat.</td></tr>'}</tbody></table>${rentalTermsLine}</section>
+    ${returnSummary}${paymentSummary}${rentalTerms}
+    ${officialDocumentFooter(type === 'rental')}</article>`;
+  printOfficialDocument(content);
+}
+
+function printLateNotice(rentalId) {
+  const rental = state.rentals.find(row => row.id_sewa === rentalId);
+  if (!rental) return notify('Data penyewaan terlambat tidak ditemukan.', true);
+  const daysLate = Math.max(0, -daysUntil(rental.tgl_rencana_kembali));
+  if (!daysLate) return notify('Penyewaan ini belum terlambat.', true);
+  const customer = rental.pelanggan || {};
+  const details = rental.detail_penyewaan || [];
+  const finePerDay = details.reduce((sum, detail) =>
+    sum + Number(detail.jumlah || 1) * Number(detail.alat_musik?.denda_per_hari || 0), 0);
+  const accruedFine = finePerDay * daysLate;
+  const items = details.map(detail => `<tr><td>${escapeHtml(detail.alat_musik?.nama_alat || 'Alat musik')}</td><td>${Number(detail.jumlah || 1)}</td><td>${currency.format(Number(detail.alat_musik?.denda_per_hari || 0))}</td></tr>`).join('');
+  const business = window.RITME_BUSINESS_INFO || {};
+  const reference = `TAG-S-${rental.id_sewa}-${localDateValue().replace(/-/g, '')}`;
+  const content = `<article class="official-document">
+    ${officialDocumentHeader('SURAT TAGIHAN KETERLAMBATAN', reference, localDateValue())}
+    <section class="official-section"><h3>Ditujukan kepada</h3><dl class="official-details">
+      <dt>Nama penyewa</dt><dd>${escapeHtml(customer.nama || 'Pelanggan')}</dd>
+      <dt>Nomor kontak</dt><dd>${escapeHtml(customer.no_hp || 'Tidak tersedia')}</dd>
+      <dt>Nomor transaksi sewa</dt><dd>S-${rental.id_sewa}</dd>
+    </dl></section>
+    <section class="official-section"><h3>Alat yang belum dikembalikan</h3><table class="official-table"><thead><tr><th>Alat musik</th><th>Jumlah</th><th>Denda / hari / unit</th></tr></thead><tbody>${items || '<tr><td colspan="3">Rincian alat tidak tersedia.</td></tr>'}</tbody></table>
+      <p class="official-note">Tanggal kembali rencana: <strong>${formatOfficialDate(rental.tgl_rencana_kembali)}</strong> · Terlambat: <strong>${daysLate} hari</strong>.</p>
+    </section>
+    <section class="official-section"><h3>Tagihan berjalan</h3><dl class="official-details">
+      <dt>Akumulasi denda hingga ${formatOfficialDate(localDateValue())}</dt><dd><strong>${currency.format(accruedFine)}</strong></dd>
+      <dt>Tarif denda per hari (total)</dt><dd>${currency.format(finePerDay)}</dd>
+    </dl><p>Jumlah denda berjalan dapat bertambah setiap hari sampai alat dikembalikan dan diproses.</p></section>
+    <section class="official-section"><h3>Informasi pembayaran</h3><p>Rekening: <strong>${escapeHtml(business.bankAccount || 'Belum dikonfigurasi')}</strong></p><p>QRIS: <strong>${escapeHtml(business.qris || 'Belum dikonfigurasi')}</strong></p></section>
+    ${officialDocumentFooter()}</article>`;
+  printOfficialDocument(content);
 }
 
 function renderEquipmentReport() {
@@ -1446,6 +1635,99 @@ function exportLedger() {
   downloadCsv(`buku-besar-${data.code}-${document.querySelector('#ledger-start').value || 'awal'}-${document.querySelector('#ledger-end').value || 'akhir'}.csv`, [header, ...rows]);
 }
 
+function printJournalReport() {
+  if (!state.journals.length) return notify('Belum ada jurnal untuk dicetak.', true);
+  const rows = [...state.journals].sort((a, b) =>
+    a.tgl_jurnal.localeCompare(b.tgl_jurnal) || a.id_jurnal - b.id_jurnal);
+  const debit = rows.reduce((sum, row) => sum + Number(row.debit), 0);
+  const credit = rows.reduce((sum, row) => sum + Number(row.kredit), 0);
+  const tableRows = rows.map(row => {
+    const ref = row.id_pembayaran_sewa ? `PS-${row.id_pembayaran_sewa}`
+      : row.id_pembayaran ? `PD-${row.id_pembayaran}`
+        : row.id_pengembalian ? `K-${row.id_pengembalian}`
+          : row.id_sewa ? `S-${row.id_sewa}` : '—';
+    return `<tr><td>${formatDate(row.tgl_jurnal)}</td><td>J-${row.id_jurnal}</td><td>${escapeHtml(row.keterangan)}</td><td>${ref}</td><td>${currency.format(Number(row.debit))}</td><td>${currency.format(Number(row.kredit))}</td><td>—</td></tr>`;
+  }).join('');
+  const content = `<article class="official-document">
+    ${officialDocumentHeader('JURNAL UMUM', `JU-${localDateValue().replace(/-/g, '')}`, localDateValue())}
+    <section class="official-section"><table class="official-table"><thead><tr><th>Tanggal</th><th>No. bukti</th><th>Keterangan</th><th>Ref</th><th>Debit</th><th>Kredit</th><th>Saldo</th></tr></thead>
+      <tbody>${tableRows}<tr class="official-total"><th colspan="4">TOTAL</th><th>${currency.format(debit)}</th><th>${currency.format(credit)}</th><th>—</th></tr></tbody></table>
+      <p class="official-note">Saldo berjalan ditampilkan pada laporan buku besar per akun; jurnal umum mencatat debit dan kredit per baris.</p></section>
+    ${officialDocumentFooter()}</article>`;
+  printOfficialDocument(content, true);
+}
+
+function printLedgerReport() {
+  let data;
+  try {
+    data = getLedgerData();
+  } catch (error) {
+    return notify(error.message, true);
+  }
+  if (!data) return notify('Pilih akun sebelum mengekspor buku besar PDF.', true);
+  if (!data.rows.length) return notify('Tidak ada mutasi akun pada periode ini.', true);
+  const start = document.querySelector('#ledger-start').value;
+  const end = document.querySelector('#ledger-end').value;
+  const rows = data.rows.map(row => {
+    const ref = row.id_pembayaran_sewa ? `PS-${row.id_pembayaran_sewa}`
+      : row.id_pembayaran ? `PD-${row.id_pembayaran}`
+        : row.id_pengembalian ? `K-${row.id_pengembalian}`
+          : row.id_sewa ? `S-${row.id_sewa}` : '—';
+    return `<tr><td>${formatDate(row.tgl_jurnal)}</td><td>J-${row.id_jurnal}</td><td>${escapeHtml(row.keterangan)}</td><td>${ref}</td><td>${currency.format(Number(row.debit))}</td><td>${currency.format(Number(row.kredit))}</td><td>${formatAccountBalance(row.balance, data.code)}</td></tr>`;
+  }).join('');
+  const content = `<article class="official-document">
+    ${officialDocumentHeader(`BUKU BESAR · ${data.accountName}`, `BB-${data.code}-${localDateValue().replace(/-/g, '')}`, localDateValue())}
+    <p class="official-note">Akun ${escapeHtml(data.code)} · Periode ${start ? formatOfficialDate(start) : 'awal'} s.d. ${end ? formatOfficialDate(end) : 'sekarang'} · Saldo awal: ${formatAccountBalance(data.opening, data.code)}</p>
+    <section class="official-section"><table class="official-table"><thead><tr><th>Tanggal</th><th>No. bukti</th><th>Keterangan</th><th>Ref</th><th>Debit</th><th>Kredit</th><th>Saldo berjalan</th></tr></thead>
+      <tbody>${rows}<tr class="official-total"><th colspan="4">TOTAL MUTASI</th><th>${currency.format(data.debit)}</th><th>${currency.format(data.credit)}</th><th>${formatAccountBalance(data.balance, data.code)}</th></tr></tbody></table></section>
+    ${officialDocumentFooter()}</article>`;
+  printOfficialDocument(content, true);
+}
+
+function printIncomeReport() {
+  if (!state.detail) return notify('Data laporan belum dimuat.', true);
+  let months;
+  try {
+    months = getIncomeRows();
+  } catch (error) {
+    return notify(error.message, true);
+  }
+  const totals = months.reduce((result, row) => ({
+    rentRevenue: result.rentRevenue + row.rentRevenue,
+    fineRevenue: result.fineRevenue + row.fineRevenue,
+    rentCash: result.rentCash + row.rentCash,
+    fineCash: result.fineCash + row.fineCash
+  }), { rentRevenue: 0, fineRevenue: 0, rentCash: 0, fineCash: 0 });
+  const { paidByReturn, paidByRental } = detailLookups();
+  const receivables = state.detail.rentals.reduce((sum, rental) =>
+    sum + (rental.basis_pencatatan === 'Kas' ? 0
+      : Math.max(0, Number(rental.total_biaya) - (paidByRental.get(rental.id_sewa) || 0))), 0)
+    + state.detail.returns.reduce((sum, row) =>
+      sum + Math.max(0, Number(row.total_denda) - (paidByReturn.get(row.id_pengembalian) || 0)), 0);
+  const rows = months.map(row => {
+    const monthLabel = new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'UTC', month: 'long', year: 'numeric'
+    }).format(new Date(`${row.month}-01T00:00:00Z`));
+    return `<tr><td>${monthLabel}</td><td>${currency.format(row.rentRevenue)}</td><td>${currency.format(row.fineRevenue)}</td><td>${currency.format(row.rentRevenue + row.fineRevenue)}</td><td>${currency.format(row.rentCash + row.fineCash)}</td></tr>`;
+  }).join('');
+  const start = document.querySelector('#income-start').value;
+  const end = document.querySelector('#income-end').value;
+  const content = `<article class="official-document">
+    ${officialDocumentHeader('LAPORAN PENDAPATAN', `LP-${localDateValue().replace(/-/g, '')}`, localDateValue())}
+    <p class="official-note">Periode ${start ? formatOfficialDate(start) : 'awal'} s.d. ${end ? formatOfficialDate(end) : 'sekarang'}</p>
+    <section class="official-section"><h3>Ringkasan periode</h3><dl class="official-details">
+      <dt>Pendapatan sewa (akrual)</dt><dd>${currency.format(totals.rentRevenue)}</dd>
+      <dt>Pendapatan denda (akrual)</dt><dd>${currency.format(totals.fineRevenue)}</dd>
+      <dt>Kas riil diterima</dt><dd>${currency.format(totals.rentCash + totals.fineCash)}</dd>
+      <dt>Piutang belum tertagih saat cetak</dt><dd>${currency.format(receivables)}</dd>
+    </dl></section>
+    <section class="official-section"><h3>Rincian bulanan</h3><table class="official-table"><thead><tr><th>Periode</th><th>Pendapatan sewa</th><th>Pendapatan denda</th><th>Total pendapatan</th><th>Kas diterima</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5">Tidak ada transaksi pada periode ini.</td></tr>'}
+      <tr class="official-total"><th>TOTAL</th><th>${currency.format(totals.rentRevenue)}</th><th>${currency.format(totals.fineRevenue)}</th><th>${currency.format(totals.rentRevenue + totals.fineRevenue)}</th><th>${currency.format(totals.rentCash + totals.fineCash)}</th></tr></tbody></table></section>
+    ${officialDocumentFooter()}</article>`;
+  printOfficialDocument(content, true);
+}
+
 function renderJournals() {
   const accountSelect = document.querySelector('#ledger-account');
   const previousAccount = accountSelect.value;
@@ -1571,7 +1853,10 @@ function initializeApplication() {
   document.querySelector('#ledger-account').addEventListener('change', renderLedger);
   document.querySelector('#download-detail-csv').addEventListener('click', exportDetailReport);
   document.querySelector('#download-income-csv').addEventListener('click', exportIncomeReport);
+  document.querySelector('#download-income-pdf').addEventListener('click', printIncomeReport);
   document.querySelector('#download-ledger-csv').addEventListener('click', exportLedger);
+  document.querySelector('#download-ledger-pdf').addEventListener('click', printLedgerReport);
+  document.querySelector('#download-journal-pdf').addEventListener('click', printJournalReport);
   document.querySelectorAll('[data-payment-amount]').forEach(button => button.addEventListener('click', () => {
     fillPaymentAmount(button.dataset.paymentAmount);
   }));
@@ -1592,6 +1877,10 @@ function initializeApplication() {
   document.addEventListener('click', event => {
     const button = event.target.closest('[data-print-receipt]');
     if (button) printTransactionReceipt(button.dataset.printReceipt, Number(button.dataset.receiptId));
+    const pdfButton = event.target.closest('[data-print-pdf]');
+    if (pdfButton) printTransactionDocument(pdfButton.dataset.printPdf, Number(pdfButton.dataset.receiptId));
+    const lateNoticeButton = event.target.closest('[data-print-late-notice]');
+    if (lateNoticeButton) printLateNotice(Number(lateNoticeButton.dataset.printLateNotice));
   });
   document.querySelector('#download-csv').addEventListener('click', exportJournals);
   document.querySelector('#record-editor-form').addEventListener('submit', saveRecordEdit);

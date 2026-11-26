@@ -21,11 +21,17 @@ Repository berisi kode sumber, skema database, panduan, dan konfigurasi deployme
 | **Pengembalian** | Mencatat tanggal kembali, menghitung keterlambatan dan denda secara otomatis, menyelesaikan penyewaan, dan mengembalikan status alat menjadi tersedia. Konfirmasi sebelum proses merangkum unit, durasi, dan estimasi denda. |
 | **Pembayaran sewa** | Mencatat penerimaan tunai, transfer, atau QRIS. Pembayaran dapat dicicil; sistem menghitung sisa tagihan dan mencegah pembayaran melebihi saldo. Kalkulator kas menampilkan kekurangan/kembalian dan tombol pecahan tunai. |
 | **Pembayaran denda** | Mencatat pelunasan atau cicilan denda dengan validasi sisa tagihan, pilihan metode pembayaran, dan riwayat pembayaran. Konfirmasi merangkum tagihan sebelum disimpan; kalkulator kas mendukung uang pas dan kembalian. |
-| **Pengingat dan kuitansi** | Pengingat WhatsApp dibuat sebagai tautan yang ditinjau/dikirim kasir, bukan pesan otomatis di latar belakang. Struk rental, pengembalian, dan pembayaran dapat dicetak atau disimpan sebagai PDF dari dialog cetak browser. |
+| **Pengingat dan dokumen transaksi** | Pengingat WhatsApp dibuat sebagai tautan yang ditinjau/dikirim kasir, bukan pesan otomatis di latar belakang. Bukti sewa, berita acara pengembalian, kuitansi pembayaran, serta surat tagihan rental terlambat dapat dicetak atau disimpan sebagai PDF dari dialog cetak browser. |
 | **Pelanggan & inventaris** | Menampilkan daftar pelanggan, riwayat rental dan pembayaran sewa/denda, performa alat, serta laporan denda berdasarkan periode. |
-| **Jurnal umum** | Menghasilkan jurnal debit/kredit secara otomatis saat rental dibuat, pengembalian menimbulkan denda, dan pembayaran sewa atau denda diterima. |
-| **Buku besar** | Menelusuri mutasi, saldo awal, debit, kredit, dan saldo berjalan per akun dengan filter periode dan ekspor CSV. |
-| **Laporan pendapatan** | Merangkum pendapatan sewa dan denda yang diakui, dibandingkan dengan kas yang benar-benar diterima, per bulan dan rentang tanggal; tersedia ekspor CSV. |
+| **Jurnal umum** | Menghasilkan jurnal debit/kredit secara otomatis saat rental dibuat, pengembalian menimbulkan denda, dan pembayaran sewa atau denda diterima. Laporan dapat dicetak/disimpan sebagai PDF maupun CSV. |
+| **Buku besar** | Menelusuri mutasi, saldo awal, debit, kredit, dan saldo berjalan per akun dengan filter periode; tersedia ekspor CSV dan PDF. |
+| **Laporan pendapatan** | Merangkum pendapatan sewa dan denda yang diakui, dibandingkan dengan kas yang benar-benar diterima, per bulan dan rentang tanggal; tersedia ekspor CSV dan PDF. |
+
+### Dokumen PDF operasional
+
+Tombol **Ekspor PDF** atau **Unduh PDF** membuka dialog cetak browser; pilih **Simpan sebagai PDF** untuk menyimpan berkas. Tidak ada pustaka PDF atau perubahan skema database tambahan. Laporan jurnal, buku besar, dan pendapatan menyertakan kop, periode yang dipilih (jika tersedia), total, dan nomor halaman. Bukti transaksi tersedia melalui riwayat rental/pembayaran pelanggan; surat tagihan tersedia untuk rental yang terlambat pada jadwal dashboard.
+
+Alamat, WhatsApp, email, rekening, dan QRIS usaha hanya dicantumkan bila tersedia di `window.RITME_BUSINESS_INFO`; data yang belum dikonfigurasi ditandai apa adanya. Kondisi fisik alat tidak disimpan dalam skema saat ini, sehingga berita acara menyediakan baris untuk pemeriksaan dan pencatatan manual.
 
 ### Alur rental dan pencatatan akuntansi
 

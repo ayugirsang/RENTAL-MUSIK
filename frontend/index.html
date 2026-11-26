@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=operational-v1">
+  <link rel="stylesheet" href="css/style.css?v=pdf-documents-v1">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase.js"></script>
-  <script src="js/app.js?v=operational-v1" defer></script>
+  <script src="js/app.js?v=pdf-documents-v1" defer></script>
 </head>
 <body>
   <section class="auth-gate" id="auth-gate" aria-labelledby="auth-title">
@@ -241,14 +241,14 @@
       </section>
 
       <section class="view" id="view-reports" aria-labelledby="reports-title">
-        <div class="page-heading"><div><div class="eyebrow">AKUNTANSI</div><h1 id="reports-title">Jurnal umum</h1><p>Seluruh transaksi akuntansi rental, penerimaan sewa, dan denda keterlambatan.</p></div><button class="button button-outline" id="download-csv" type="button"><span aria-hidden="true">↓</span> Unduh CSV</button></div>
+        <div class="page-heading"><div><div class="eyebrow">AKUNTANSI</div><h1 id="reports-title">Jurnal umum</h1><p>Seluruh transaksi akuntansi rental, penerimaan sewa, dan denda keterlambatan.</p></div><div class="heading-actions"><button class="button button-outline" id="download-csv" type="button"><span aria-hidden="true">↓</span> Unduh CSV</button><button class="button button-outline" id="download-journal-pdf" type="button">Ekspor PDF</button></div></div>
         <section class="panel journal-panel"><div class="journal-summary"><div><span class="summary-label">TOTAL DEBIT</span><strong id="journal-debit">Rp0</strong></div><div><span class="summary-label">TOTAL KREDIT</span><strong id="journal-credit">Rp0</strong></div><div class="journal-count"><span class="summary-label">BARIS JURNAL</span><strong id="journal-count">0</strong></div></div>
           <div class="table-wrap"><table class="journal-table"><thead><tr><th>TANGGAL</th><th>AKUN</th><th>KETERANGAN</th><th class="amount-cell">DEBIT</th><th class="amount-cell">KREDIT</th></tr></thead><tbody id="journal-table"><tr><td colspan="5" class="empty-cell">Memuat jurnal...</td></tr></tbody></table></div>
           <div class="journal-foot"><span><span class="live-dot"></span> Jurnal seimbang, diperbarui otomatis</span><span>Terbaru di atas</span></div>
         </section>
       </section>
       <section class="view" id="view-ledger" aria-labelledby="ledger-title">
-        <div class="page-heading"><div><div class="eyebrow">AKUNTANSI</div><h1 id="ledger-title">Buku besar</h1><p>Periksa mutasi dan saldo berjalan setiap akun dari jurnal umum.</p></div><button class="button button-outline" id="download-ledger-csv" type="button"><span aria-hidden="true">↓</span> Unduh CSV</button></div>
+        <div class="page-heading"><div><div class="eyebrow">AKUNTANSI</div><h1 id="ledger-title">Buku besar</h1><p>Periksa mutasi dan saldo berjalan setiap akun dari jurnal umum.</p></div><div class="heading-actions"><button class="button button-outline" id="download-ledger-csv" type="button"><span aria-hidden="true">↓</span> Unduh CSV</button><button class="button button-outline" id="download-ledger-pdf" type="button">Ekspor PDF</button></div></div>
         <section class="panel ledger-panel">
           <div class="ledger-filters">
             <div><label class="field-label" for="ledger-account">Pilih akun</label><select id="ledger-account"><option value="">Semua akun</option></select></div>
@@ -261,7 +261,7 @@
         </section>
       </section>
       <section class="view" id="view-income" aria-labelledby="income-title">
-        <div class="page-heading"><div><div class="eyebrow">ANALISIS KEUANGAN</div><h1 id="income-title">Laporan pendapatan</h1><p>Bandingkan pendapatan yang diakui dengan kas sewa dan denda yang benar-benar diterima.</p></div><button class="button button-outline" id="download-income-csv" type="button"><span aria-hidden="true">↓</span> Unduh CSV</button></div>
+        <div class="page-heading"><div><div class="eyebrow">ANALISIS KEUANGAN</div><h1 id="income-title">Laporan pendapatan</h1><p>Bandingkan pendapatan yang diakui dengan kas sewa dan denda yang benar-benar diterima.</p></div><div class="heading-actions"><button class="button button-outline" id="download-income-csv" type="button"><span aria-hidden="true">↓</span> Unduh CSV</button><button class="button button-outline" id="download-income-pdf" type="button">Ekspor PDF</button></div></div>
         <section class="panel income-panel">
           <div class="report-filters">
             <div><label class="field-label" for="income-start">Dari tanggal</label><input id="income-start" type="date"></div>
