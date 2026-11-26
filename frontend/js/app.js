@@ -556,7 +556,7 @@ function instrumentPhoto(name) {
   if (/terompet|trompet|trumpet/.test(name)) return 'trumpet.jpg';
   if (/flute|seruling|suling/.test(name)) return 'flute.jpg';
   if (/biola|violin|cello|selo/.test(name)) return 'violin.jpg';
-  if (/ampli|speaker|pengeras suara/.test(name)) return 'amplifier.jpg';
+  if (/ampli|speaker|pengeras suara/.test(name)) return 'amplifier.png';
   if (/ukulele|uke/.test(name)) return 'ukulele.jpg';
   if (/gitar akustik|guitar acoustic|acoustic guitar/.test(name)) return 'acoustic-guitar.jpg';
   if (/gitar elektrik|gitar listrik|guitar electric|electric guitar|bass/.test(name)) return 'electric-guitar.jpg';
