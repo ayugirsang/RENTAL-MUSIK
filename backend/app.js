@@ -362,6 +362,38 @@ app.get('/api/penyewaan/belum-lunas', async (_req, res) => {
   }).filter(row => row.sisa_tagihan > 0));
 });
 
+app.get('/api/kerusakan/belum-lunas', async (_req, res) => {
+  const { data: returns, error } = await supabase.from('pengembalian')
+    .select('id_pengembalian, id_sewa, biaya_kerusakan')
+    .gt('biaya_kerusakan', 0).order('id_pengembalian', { ascending: false });
+  if (error) return sendDatabaseError(res, error, 500);
+  if (!returns.length) return res.json([]);
+
+  const ids = returns.map(row => row.id_pengembalian);
+  const rentalIds = returns.map(row => row.id_sewa);
+  const [{ data: payments, error: paymentError }, { data: rentals, error: rentalError }] = await Promise.all([
+    supabase.from('pembayaran_kerusakan').select('id_pengembalian, jumlah_bayar').in('id_pengembalian', ids),
+    supabase.from('penyewaan').select('id_sewa, pelanggan(nama)').in('id_sewa', rentalIds)
+  ]);
+  if (paymentError || rentalError) return sendDatabaseError(res, paymentError || rentalError, 500);
+
+  const paidByReturn = new Map();
+  for (const payment of payments) {
+    paidByReturn.set(payment.id_pengembalian,
+      (paidByReturn.get(payment.id_pengembalian) || 0) + Number(payment.jumlah_bayar));
+  }
+  const rentalById = new Map(rentals.map(row => [row.id_sewa, row]));
+  res.json(returns.map(row => {
+    const paid = paidByReturn.get(row.id_pengembalian) || 0;
+    return {
+      ...row,
+      nama_pelanggan: rentalById.get(row.id_sewa)?.pelanggan?.nama || 'Pelanggan',
+      total_terbayar: paid,
+      sisa_kerusakan: Math.max(0, Number(row.biaya_kerusakan) - paid)
+    };
+  }).filter(row => row.sisa_kerusakan > 0));
+});
+
 app.post('/api/pembayaran-denda', async (req, res) => {
   const { id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar } = req.body;
   const amount = Number(jumlah_bayar);
@@ -372,6 +404,21 @@ app.post('/api/pembayaran-denda', async (req, res) => {
   const { data, error } = await supabase.from('pembayaran_denda')
     .insert({ id_pengembalian, tgl_bayar, jumlah_bayar: amount, metode_bayar })
     .select('id_pembayaran, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar').single();
+  if (error) return sendDatabaseError(res, error);
+  res.status(201).json(data);
+});
+
+app.post('/api/pembayaran-kerusakan', async (req, res) => {
+  const { id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar } = req.body;
+  const amount = Number(jumlah_bayar);
+  if (!isPositiveInteger(id_pengembalian) || !isValidDate(tgl_bayar)
+    || !Number.isFinite(amount) || amount <= 0
+    || !['Tunai', 'Transfer', 'QRIS'].includes(metode_bayar)) {
+    return res.status(400).json({ error: 'Lengkapi tagihan, tanggal, jumlah positif, dan metode pembayaran yang valid.' });
+  }
+  const { data, error } = await supabase.from('pembayaran_kerusakan')
+    .insert({ id_pengembalian, tgl_bayar, jumlah_bayar: amount, metode_bayar })
+    .select('id_pembayaran_kerusakan, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar').single();
   if (error) return sendDatabaseError(res, error);
   res.status(201).json(data);
 });
@@ -391,17 +438,18 @@ app.post('/api/pembayaran-sewa', async (req, res) => {
 });
 
 app.get('/api/detail', async (_req, res) => {
-  const [customers, equipment, rentals, rentalDetails, returns, payments, rentalPayments] = await Promise.all([
+  const [customers, equipment, rentals, rentalDetails, returns, payments, rentalPayments, damagePayments] = await Promise.all([
     getAllRows('pelanggan', 'id_pelanggan, nama, no_hp, alamat', 'id_pelanggan'),
     getAllRows('alat_musik', 'id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status', 'id_alat'),
     getAllRows('penyewaan', 'id_sewa, id_pelanggan, tgl_sewa, tgl_rencana_kembali, total_biaya, status_sewa, status_pembayaran_sewa, basis_pencatatan', 'id_sewa'),
     getAllRows('detail_penyewaan', 'id_detail, id_sewa, id_alat, jumlah, subtotal', 'id_detail'),
     getAllRows('pengembalian', 'id_pengembalian, id_sewa, tgl_kembali_aktual, hari_terlambat, total_denda, status_pembayaran_denda, kondisi_alat, biaya_kerusakan, catatan_kerusakan', 'id_pengembalian'),
     getAllRows('pembayaran_denda', 'id_pembayaran, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran'),
-    getAllRows('pembayaran_sewa', 'id_pembayaran_sewa, id_sewa, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran_sewa')
+    getAllRows('pembayaran_sewa', 'id_pembayaran_sewa, id_sewa, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran_sewa'),
+    getAllRows('pembayaran_kerusakan', 'id_pembayaran_kerusakan, id_pengembalian, tgl_bayar, jumlah_bayar, metode_bayar, created_at', 'id_pembayaran_kerusakan')
   ]);
   const error = customers.error || equipment.error || rentals.error
-    || rentalDetails.error || returns.error || payments.error || rentalPayments.error;
+    || rentalDetails.error || returns.error || payments.error || rentalPayments.error || damagePayments.error;
   if (error) return sendDatabaseError(res, error, 500);
   res.json({
     customers: customers.data,
@@ -410,7 +458,8 @@ app.get('/api/detail', async (_req, res) => {
     rentalDetails: rentalDetails.data,
     returns: returns.data,
     payments: payments.data,
-    rentalPayments: rentalPayments.data
+    rentalPayments: rentalPayments.data,
+    damagePayments: damagePayments.data
   });
 });
 

@@ -116,6 +116,14 @@ erDiagram
         text metode_bayar
         timestamptz created_at
     }
+    pembayaran_kerusakan {
+        bigint id_pembayaran_kerusakan PK
+        bigint id_pengembalian FK
+        date tgl_bayar
+        numeric jumlah_bayar
+        text metode_bayar
+        timestamptz created_at
+    }
     jurnal_akuntansi {
         bigint id_jurnal PK
         bigint id_pengembalian FK
@@ -136,6 +144,7 @@ erDiagram
     penyewaan ||--o| pengembalian : dikembalikan
     penyewaan ||--o{ pembayaran_sewa : menerima
     pengembalian ||--o{ pembayaran_denda : menerima
+    pengembalian ||--o{ pembayaran_kerusakan : menerima
     penyewaan o|--o{ jurnal_akuntansi : sumber_sewa
     pengembalian o|--o{ jurnal_akuntansi : sumber_denda
     pembayaran_sewa o|--o{ jurnal_akuntansi : sumber_pembayaran
@@ -194,6 +203,8 @@ Di GitHub Pages, frontend mengakses Supabase langsung menggunakan publishable ke
    ```
 
 Jika database sudah ada, jalankan [`backend/migrations/20261011_add_rental_payment_accounting.sql`](./backend/migrations/20261011_add_rental_payment_accounting.sql) **sekali** melalui Supabase SQL Editor sebelum menggunakan versi aplikasi ini. Migrasi menambahkan tabel pembayaran sewa dan kolom jurnal; rental lama ditandai **Belum Dicatat** agar histori yang tidak diketahui tidak diasumsikan sudah dibayar.
+
+Untuk mengaktifkan cicilan dan pelunasan biaya kerusakan, jalankan [`backend/migrations/20261126_add_damage_payments.sql`](./backend/migrations/20261126_add_damage_payments.sql) sekali setelah `add_damage_handling.sql` dan `20261125_admin_auth_and_rls.sql` selesai. Migrasi ini membuat tabel pembayaran baru, membatasi pembayaran agar tidak melebihi sisa biaya, dan menjurnal Kas (Debit) terhadap Piutang Ganti Rugi Kerusakan (Kredit). Pembayaran denda keterlambatan tetap menggunakan tabel dan alur terpisah.
 
 Untuk menambahkan delapan instrumen contoh ke database yang sudah pernah dibuat, jalankan sekali [`backend/migrations/20261008_add_more_instruments.sql`](./backend/migrations/20261008_add_more_instruments.sql) melalui Supabase SQL Editor. Migrasi tersebut tidak menggandakan alat dengan nama yang sama.
 

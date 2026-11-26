@@ -9,12 +9,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=return-damage-v1">
+  <link rel="stylesheet" href="css/style.css?v=damage-payments-v1">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase.js"></script>
-  <script src="js/print-receipt.js?v=return-damage-v1" defer></script>
-  <script src="js/app.js?v=return-damage-v1" defer></script>
+  <script src="js/print-receipt.js?v=damage-payments-v1" defer></script>
+  <script src="js/app.js?v=damage-payments-v1" defer></script>
 </head>
 <body>
   <section class="auth-gate" id="auth-gate" aria-labelledby="auth-title">
@@ -202,6 +202,21 @@
                 <button class="button button-yellow button-wide" type="submit">Simpan pembayaran <span>→</span></button>
               </form>
             </section>
+            <section class="panel form-panel payment-panel"><div class="panel-heading"><div><div class="eyebrow">05 / TERIMA PEMBAYARAN</div><h2>Pelunasan biaya kerusakan</h2></div><span class="step-mark step-yellow">05</span></div>
+              <form id="damage-payment-form" class="form-stack">
+                <label class="field-label" for="payment-damage-return">Tagihan kerusakan belum lunas <span class="required">*</span></label><select id="payment-damage-return" required><option value="">Pilih tagihan kerusakan</option></select>
+                <div class="field-pair"><div><label class="field-label" for="damage-payment-date">Tanggal bayar</label><input id="damage-payment-date" type="date" required></div><div><label class="field-label" for="damage-payment-method">Metode</label><select id="damage-payment-method" required><option value="Tunai">Tunai</option><option value="Transfer">Transfer</option><option value="QRIS">QRIS</option></select></div></div>
+                <div id="damage-payment-summary" class="payment-summary" aria-live="polite" hidden></div>
+                <label class="field-label" for="damage-payment-amount">Jumlah dibayar (Rp) <span class="required">*</span></label><input id="damage-payment-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="0" required>
+                <label class="field-label" for="damage-payment-cash-received">Uang diterima (Rp)</label><input id="damage-payment-cash-received" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required>
+                <div class="cash-quick-actions" data-cash-quick-for="damage-payment-form">
+                  <button class="payment-quick-button" type="button" data-cash-amount="exact">Uang pas</button><button class="payment-quick-button" type="button" data-cash-amount="50000">Rp 50.000</button><button class="payment-quick-button" type="button" data-cash-amount="100000">Rp 100.000</button><button class="payment-quick-button" type="button" data-cash-amount="200000">Rp 200.000</button>
+                </div>
+                <small class="cash-feedback field-hint" id="damage-payment-cash-feedback" aria-live="polite">Pilih tagihan dan masukkan jumlah uang diterima.</small>
+                <small id="damage-payment-balance" class="field-hint" aria-live="polite">Pilih tagihan untuk melihat sisa biaya kerusakan.</small>
+                <button class="button button-yellow button-wide" type="submit">Simpan pelunasan kerusakan <span>→</span></button>
+              </form>
+            </section>
           </div>
         </div>
       </section>
@@ -220,7 +235,7 @@
             <div id="rental-payment-history" class="table-wrap"><div class="quiet-message">Pilih penyewaan untuk melihat riwayat pembayarannya.</div></div>
           </div>
           <div class="detail-section">
-            <div class="panel-heading"><div><div class="eyebrow">RIWAYAT CICILAN</div><h2>Rincian pembayaran denda</h2></div></div>
+            <div class="panel-heading"><div><div class="eyebrow">RIWAYAT CICILAN</div><h2>Rincian pembayaran denda & kerusakan</h2></div></div>
             <label class="field-label" for="history-return">Pilih tagihan</label>
             <select id="history-return"><option value="">Pilih tagihan denda</option></select>
             <div id="payment-history" class="table-wrap"><div class="quiet-message">Pilih tagihan untuk melihat riwayat pembayarannya.</div></div>
@@ -246,6 +261,9 @@
               <article class="report-metric"><span>Denda tercatat</span><strong id="report-fines">Rp0</strong></article>
               <article class="report-metric"><span>Pembayaran diterima</span><strong id="report-paid">Rp0</strong></article>
               <article class="report-metric"><span>Sisa tagihan denda</span><strong id="report-outstanding">Rp0</strong></article>
+              <article class="report-metric"><span>Biaya kerusakan</span><strong id="report-damage-total">Rp0</strong></article>
+              <article class="report-metric"><span>Pembayaran kerusakan</span><strong id="report-damage-paid">Rp0</strong></article>
+              <article class="report-metric"><span>Sisa biaya kerusakan</span><strong id="report-damage-outstanding">Rp0</strong></article>
             </div>
             <div id="financial-report" class="table-wrap"></div>
           </div>
