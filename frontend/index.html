@@ -158,23 +158,7 @@
                 <button class="button button-outline button-wide" type="submit">Catat pengembalian <span>→</span></button>
               </form>
             </section>
-            <section class="panel form-panel payment-panel"><div class="panel-heading"><div><div class="eyebrow">03 / TERIMA PEMBAYARAN</div><h2>Pembayaran denda</h2></div><span class="step-mark step-yellow">03</span></div>
-              <form id="payment-form" class="form-stack">
-                <label class="field-label" for="payment-return">Denda belum lunas <span class="required">*</span></label><select id="payment-return" required><option value="">Pilih tagihan</option></select>
-                <div class="field-pair"><div><label class="field-label" for="payment-date">Tanggal bayar</label><input id="payment-date" type="date" required></div><div><label class="field-label" for="payment-method">Metode</label><select id="payment-method" required><option value="Tunai">Tunai</option><option value="Transfer">Transfer</option><option value="QRIS">QRIS</option></select></div></div>
-                <div id="payment-summary" class="payment-summary" aria-live="polite" hidden></div>
-                <label class="field-label" for="payment-amount">Jumlah dibayar (Rp) <span class="required">*</span></label><input id="payment-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="0" required>
-                <label class="field-label" for="payment-cash-received">Uang diterima (Rp)</label><input id="payment-cash-received" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required>
-                <div class="cash-quick-actions" data-cash-quick-for="payment-form">
-                  <button class="payment-quick-button" type="button" data-cash-amount="exact">Uang pas</button><button class="payment-quick-button" type="button" data-cash-amount="50000">Rp 50.000</button><button class="payment-quick-button" type="button" data-cash-amount="100000">Rp 100.000</button><button class="payment-quick-button" type="button" data-cash-amount="200000">Rp 200.000</button>
-                </div>
-                <small class="cash-feedback field-hint" id="payment-cash-feedback" aria-live="polite">Pilih tagihan dan masukkan jumlah uang diterima.</small>
-                <div class="payment-quick-actions"><button class="payment-quick-button" type="button" data-payment-amount="half" disabled>Isi setengah sisa</button><button class="payment-quick-button" type="button" data-payment-amount="balance" disabled>Isi sisa denda</button></div>
-                <small id="payment-balance" class="field-hint" aria-live="polite">Pilih tagihan untuk melihat sisa denda.</small>
-                <button class="button button-yellow button-wide" type="submit">Simpan pembayaran <span>→</span></button>
-              </form>
-            </section>
-            <section class="panel form-panel payment-panel rent-payment-panel"><div class="panel-heading"><div><div class="eyebrow">04 / TERIMA PEMBAYARAN</div><h2>Pembayaran sewa</h2></div><span class="step-mark">04</span></div>
+            <section class="panel form-panel payment-panel rent-payment-panel"><div class="panel-heading"><div><div class="eyebrow">03 / TERIMA PEMBAYARAN</div><h2>Pembayaran sewa</h2></div><span class="step-mark">03</span></div>
               <form id="rent-payment-form" class="form-stack">
                 <label class="field-label" for="payment-rental">Tagihan sewa <span class="required">*</span></label><select id="payment-rental" required><option value="">Pilih tagihan sewa</option></select>
                 <div class="field-pair"><div><label class="field-label" for="rent-payment-date">Tanggal bayar</label><input id="rent-payment-date" type="date" required></div><div><label class="field-label" for="rent-payment-method">Metode</label><select id="rent-payment-method" required><option value="Tunai">Tunai</option><option value="Transfer">Transfer</option><option value="QRIS">QRIS</option></select></div></div>
@@ -188,6 +172,22 @@
                 <div class="payment-quick-actions"><button class="payment-quick-button" type="button" data-rent-payment-amount="half" disabled>Isi setengah sisa</button><button class="payment-quick-button" type="button" data-rent-payment-amount="balance" disabled>Isi sisa tagihan</button></div>
                 <small id="rent-payment-balance" class="field-hint" aria-live="polite">Pilih tagihan untuk melihat sisa pembayaran.</small>
                 <button class="button button-dark button-wide" type="submit">Simpan pembayaran sewa <span>→</span></button>
+              </form>
+            </section>
+            <section class="panel form-panel payment-panel"><div class="panel-heading"><div><div class="eyebrow">04 / TERIMA PEMBAYARAN</div><h2>Pembayaran denda</h2></div><span class="step-mark step-yellow">04</span></div>
+              <form id="payment-form" class="form-stack">
+                <label class="field-label" for="payment-return">Denda belum lunas <span class="required">*</span></label><select id="payment-return" required><option value="">Pilih tagihan</option></select>
+                <div class="field-pair"><div><label class="field-label" for="payment-date">Tanggal bayar</label><input id="payment-date" type="date" required></div><div><label class="field-label" for="payment-method">Metode</label><select id="payment-method" required><option value="Tunai">Tunai</option><option value="Transfer">Transfer</option><option value="QRIS">QRIS</option></select></div></div>
+                <div id="payment-summary" class="payment-summary" aria-live="polite" hidden></div>
+                <label class="field-label" for="payment-amount">Jumlah dibayar (Rp) <span class="required">*</span></label><input id="payment-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="0" required>
+                <label class="field-label" for="payment-cash-received">Uang diterima (Rp)</label><input id="payment-cash-received" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required>
+                <div class="cash-quick-actions" data-cash-quick-for="payment-form">
+                  <button class="payment-quick-button" type="button" data-cash-amount="exact">Uang pas</button><button class="payment-quick-button" type="button" data-cash-amount="50000">Rp 50.000</button><button class="payment-quick-button" type="button" data-cash-amount="100000">Rp 100.000</button><button class="payment-quick-button" type="button" data-cash-amount="200000">Rp 200.000</button>
+                </div>
+                <small class="cash-feedback field-hint" id="payment-cash-feedback" aria-live="polite">Pilih tagihan dan masukkan jumlah uang diterima.</small>
+                <div class="payment-quick-actions"><button class="payment-quick-button" type="button" data-payment-amount="half" disabled>Isi setengah sisa</button><button class="payment-quick-button" type="button" data-payment-amount="balance" disabled>Isi sisa denda</button></div>
+                <small id="payment-balance" class="field-hint" aria-live="polite">Pilih tagihan untuk melihat sisa denda.</small>
+                <button class="button button-yellow button-wide" type="submit">Simpan pembayaran <span>→</span></button>
               </form>
             </section>
           </div>
