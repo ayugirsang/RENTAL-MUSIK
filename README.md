@@ -14,13 +14,14 @@ Repository berisi kode sumber, skema database, panduan, dan konfigurasi deployme
 
 | Menu/fitur | Penjelasan |
 | --- | --- |
-| **Dashboard** | Menampilkan pendapatan dan kas diterima bulan ini, piutang terakru, penyewaan aktif, alat tersedia, jadwal jatuh tempo, keterlambatan, tren pendapatan harian, serta tindak lanjut operasional. |
+| **Dashboard** | Menampilkan pendapatan dan kas diterima bulan ini, piutang terakru, penyewaan aktif, alat tersedia, jadwal jatuh tempo, keterlambatan, tren pendapatan harian, serta tindak lanjut operasional. Rental jatuh tempo hari ini atau terlambat diberi peringatan dan tautan pengingat WhatsApp. |
 | **Pelanggan** | Menambahkan, memperbarui, dan memilih data pelanggan untuk transaksi rental. |
 | **Inventaris alat musik** | Menyediakan contoh gitar, bass, keyboard, drum, mikrofon, biola, ukulele, cajon, saksofon, trompet, seruling, ampli, dan speaker. Penjual dapat menambahkan alat beserta tarif sewa dan denda per hari, lalu memperbarui data inventaris. Tarif unit dikunci selama sedang disewa agar transaksi berjalan tidak berubah. Pilihan alat dilengkapi foto alat musik. |
 | **Penyewaan** | Membuat penyewaan dari alat yang tersedia. Biaya dihitung dari tarif harian dan lama penyewaan. Alat yang dipilih berubah menjadi berstatus disewa. |
-| **Pengembalian** | Mencatat tanggal kembali, menghitung keterlambatan dan denda secara otomatis, menyelesaikan penyewaan, dan mengembalikan status alat menjadi tersedia. |
-| **Pembayaran sewa** | Mencatat penerimaan tunai, transfer, atau QRIS. Pembayaran dapat dicicil; sistem menghitung sisa tagihan dan mencegah pembayaran melebihi saldo. |
-| **Pembayaran denda** | Mencatat pelunasan atau cicilan denda dengan validasi sisa tagihan, pilihan metode pembayaran, dan riwayat pembayaran. |
+| **Pengembalian** | Mencatat tanggal kembali, menghitung keterlambatan dan denda secara otomatis, menyelesaikan penyewaan, dan mengembalikan status alat menjadi tersedia. Konfirmasi sebelum proses merangkum unit, durasi, dan estimasi denda. |
+| **Pembayaran sewa** | Mencatat penerimaan tunai, transfer, atau QRIS. Pembayaran dapat dicicil; sistem menghitung sisa tagihan dan mencegah pembayaran melebihi saldo. Kalkulator kas menampilkan kekurangan/kembalian dan tombol pecahan tunai. |
+| **Pembayaran denda** | Mencatat pelunasan atau cicilan denda dengan validasi sisa tagihan, pilihan metode pembayaran, dan riwayat pembayaran. Konfirmasi merangkum tagihan sebelum disimpan; kalkulator kas mendukung uang pas dan kembalian. |
+| **Pengingat dan kuitansi** | Pengingat WhatsApp dibuat sebagai tautan yang ditinjau/dikirim kasir, bukan pesan otomatis di latar belakang. Struk rental, pengembalian, dan pembayaran dapat dicetak atau disimpan sebagai PDF dari dialog cetak browser. |
 | **Pelanggan & inventaris** | Menampilkan daftar pelanggan, riwayat rental dan pembayaran sewa/denda, performa alat, serta laporan denda berdasarkan periode. |
 | **Jurnal umum** | Menghasilkan jurnal debit/kredit secara otomatis saat rental dibuat, pengembalian menimbulkan denda, dan pembayaran sewa atau denda diterima. |
 | **Buku besar** | Menelusuri mutasi, saldo awal, debit, kredit, dan saldo berjalan per akun dengan filter periode dan ekspor CSV. |

@@ -259,7 +259,7 @@ app.patch('/api/alat-musik/:id', async (req, res) => {
 
 app.get('/api/penyewaan/aktif', async (_req, res) => {
   const { data, error } = await supabase.from('penyewaan')
-    .select('id_sewa, tgl_sewa, tgl_rencana_kembali, total_biaya, pelanggan(nama), detail_penyewaan(jumlah, alat_musik(denda_per_hari))')
+    .select('id_sewa, id_pelanggan, tgl_sewa, tgl_rencana_kembali, total_biaya, pelanggan(nama, no_hp), detail_penyewaan(jumlah, subtotal, alat_musik(nama_alat, harga_sewa_per_hari, denda_per_hari))')
     .eq('status_sewa', 'Berlangsung').order('tgl_rencana_kembali');
   if (error) return sendDatabaseError(res, error, 500);
   res.json(data);

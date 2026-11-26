@@ -127,7 +127,7 @@ async function supabaseApi(url, options = {}) {
     result = await supabaseClient.from('alat_musik').select('id_alat, nama_alat, harga_sewa_per_hari, denda_per_hari, status').order('nama_alat');
   } else if (url === '/api/penyewaan/aktif') {
     result = await supabaseClient.from('penyewaan')
-      .select('id_sewa, tgl_sewa, tgl_rencana_kembali, total_biaya, pelanggan(nama), detail_penyewaan(jumlah, alat_musik(denda_per_hari))')
+      .select('id_sewa, id_pelanggan, tgl_sewa, tgl_rencana_kembali, total_biaya, pelanggan(nama, no_hp), detail_penyewaan(jumlah, subtotal, alat_musik(nama_alat, harga_sewa_per_hari, denda_per_hari))')
       .eq('status_sewa', 'Berlangsung').order('tgl_rencana_kembali');
   } else if (url === '/api/penyewaan' && options.method === 'POST') {
     result = await supabaseClient.rpc('buat_penyewaan', {
@@ -279,6 +279,15 @@ function renderDueTable() {
   document.querySelector('#count-rentals').textContent = datedRentals.length;
   document.querySelector('#count-due-soon').textContent = datedRentals.filter(({ days }) => days >= 0 && days <= 3).length;
   document.querySelector('#count-late').textContent = datedRentals.filter(({ days }) => days < 0).length;
+  const actionCount = datedRentals.filter(({ days }) => days <= 0).length;
+  const alert = document.querySelector('#due-alert');
+  alert.hidden = actionCount === 0;
+  document.querySelector('#due-alert-title').textContent =
+    `Perhatian: ${actionCount} transaksi perlu tindakan hari ini`;
+  const dueTodayCount = datedRentals.filter(({ days }) => days === 0).length;
+  const lateCount = datedRentals.filter(({ days }) => days < 0).length;
+  document.querySelector('#due-alert-detail').textContent =
+    `${dueTodayCount} jatuh tempo hari ini · ${lateCount} terlambat.`;
   const filtered = datedRentals.filter(({ days }) => {
     if (state.rentalFilter === 'soon') return days >= 0 && days <= 3;
     if (state.rentalFilter === 'late') return days < 0;
@@ -290,17 +299,41 @@ function renderDueTable() {
       : days === 0
         ? { className: 'status-today', rowClass: 'is-due-today', label: 'Jatuh tempo hari ini' }
         : days <= 3
-          ? { className: 'status-due', rowClass: 'is-due-soon', label: `Dalam ${days} hari` }
+            ? { className: 'status-due', rowClass: 'is-due-soon', label: days === 1 ? 'H-1' : `Dalam ${days} hari` }
           : { className: 'status-active', rowClass: '', label: 'Berlangsung' };
-    return `<tr class="${status.rowClass}"><td><strong>${escapeHtml(rental.pelanggan?.nama || 'Pelanggan')}</strong><small>Sewa #${rental.id_sewa}</small></td><td>${formatDate(rental.tgl_rencana_kembali)}</td><td>${currency.format(Number(rental.total_biaya))}</td><td><span class="status-pill ${status.className}"><i></i>${status.label}</span></td></tr>`;
+    const needsReminder = days <= 3;
+    const reminder = needsReminder
+        ? rental.pelanggan?.no_hp
+          ? `<a class="button button-outline button-small whatsapp-reminder" href="${createWhatsAppReminder(rental)}" target="_blank" rel="noopener noreferrer" aria-label="Kirim pengingat WhatsApp untuk Sewa #${rental.id_sewa}">WhatsApp</a>`
+          : '<span class="muted-dash">No. HP tidak tersedia</span>'
+        : '<span class="muted-dash">—</span>';
+    return `<tr class="${status.rowClass}"><td><strong>${escapeHtml(rental.pelanggan?.nama || 'Pelanggan')}</strong><small>Sewa #${rental.id_sewa}</small></td><td>${formatDate(rental.tgl_rencana_kembali)}</td><td>${currency.format(Number(rental.total_biaya))}</td><td><span class="status-pill ${status.className}"><i></i>${status.label}</span></td><td>${reminder}</td></tr>`;
   }).join('');
   const emptyMessage = state.rentalFilter === 'all' ? 'Belum ada penyewaan aktif.' : 'Tidak ada pengembalian pada filter ini.';
-  document.querySelector('#due-table').innerHTML = rows || `<tr><td colspan="4" class="empty-cell">${emptyMessage}</td></tr>`;
+  document.querySelector('#due-table').innerHTML = rows || `<tr><td colspan="5" class="empty-cell">${emptyMessage}</td></tr>`;
   document.querySelector('#due-caption').textContent = filtered.length > 8
     ? `Menampilkan 8 dari ${filtered.length} rental, diurutkan berdasarkan tanggal terdekat. Kelola daftar lengkap melalui menu Transaksi.`
     : state.rentalFilter === 'all'
       ? 'Jadwal terdekat ditampilkan lebih dahulu. Pengingat mencakup hari ini hingga 3 hari ke depan.'
       : 'Jadwal terdekat ditampilkan lebih dahulu.';
+}
+
+function createWhatsAppReminder(rental) {
+  const phone = String(rental.pelanggan?.no_hp || '').replace(/\D/g, '');
+  const internationalPhone = phone.startsWith('0') ? `62${phone.slice(1)}` : phone.startsWith('8') ? `62${phone}` : phone;
+  const items = (rental.detail_penyewaan || [])
+    .map(detail => `${detail.jumlah || 1} ${detail.alat_musik?.nama_alat || 'alat musik'}`)
+    .join(', ') || 'alat musik';
+  const finePerDay = (rental.detail_penyewaan || []).reduce((total, detail) =>
+    total + Number(detail.jumlah || 1) * Number(detail.alat_musik?.denda_per_hari || 0), 0);
+  const days = daysUntil(rental.tgl_rencana_kembali);
+  const dueText = days < 0
+    ? `sudah terlambat ${Math.abs(days)} hari sejak ${formatDate(rental.tgl_rencana_kembali)}`
+    : days === 0
+      ? `jatuh tempo hari ini (${formatDate(rental.tgl_rencana_kembali)})`
+      : `jatuh tempo pada ${formatDate(rental.tgl_rencana_kembali)}`;
+  const message = `Halo ${rental.pelanggan?.nama || 'Pelanggan'}, pengingat penyewaan ${items} dari Ritme ${dueText}. Denda keterlambatan ${currency.format(finePerDay)} per hari. Mohon hubungi Ritme jika perlu bantuan. Terima kasih.`;
+  return `https://wa.me/${encodeURIComponent(internationalPhone)}?text=${encodeURIComponent(message)}`;
 }
 
 function renderSellerFollowup() {
@@ -620,6 +653,7 @@ function updatePaymentBalance() {
   else if (select.dataset.previousValue !== select.value) amount.value = balance || '';
   else if (Number(amount.value) > balance) amount.value = balance;
   select.dataset.previousValue = select.value;
+  updateCashChange('payment-form');
 }
 
 function updateRentPaymentBalance() {
@@ -651,6 +685,119 @@ function updateRentPaymentBalance() {
   else if (select.dataset.previousValue !== select.value) amount.value = balance || '';
   else if (Number(amount.value) > balance) amount.value = balance;
   select.dataset.previousValue = select.value;
+  updateCashChange('rent-payment-form');
+}
+
+function updateCashChange(formId) {
+  const form = document.querySelector(`#${formId}`);
+  const isFine = formId === 'payment-form';
+  const amount = form.querySelector(isFine ? '#payment-amount' : '#rent-payment-amount');
+  const method = form.querySelector(isFine ? '#payment-method' : '#rent-payment-method');
+  const received = form.querySelector(isFine ? '#payment-cash-received' : '#rent-payment-cash-received');
+  const feedback = form.querySelector(isFine ? '#payment-cash-feedback' : '#rent-payment-cash-feedback');
+  const button = form.querySelector('[type="submit"]');
+  const payment = Number(amount.value) || 0;
+  const cashReceived = Number(received.value) || 0;
+  const cashMode = method.value === 'Tunai';
+
+  received.disabled = !cashMode;
+  if (!cashMode) {
+    received.value = amount.value || '';
+    feedback.textContent = `Metode ${method.value}: uang diterima sama dengan nominal pembayaran, kembalian Rp0.`;
+    feedback.classList.remove('is-error', 'is-success');
+  } else if (payment > cashReceived) {
+    feedback.textContent = `Nominal uang tunai masih kurang ${currency.format(payment - cashReceived)}.`;
+    feedback.classList.add('is-error');
+    feedback.classList.remove('is-success');
+  } else if (payment > 0) {
+    feedback.textContent = `Uang kembalian: ${currency.format(cashReceived - payment)}.`;
+    feedback.classList.add('is-success');
+    feedback.classList.remove('is-error');
+  } else {
+    feedback.textContent = 'Pilih tagihan dan masukkan jumlah uang diterima.';
+    feedback.classList.remove('is-error', 'is-success');
+  }
+  if (form.dataset.submitting !== 'true') {
+    button.disabled = cashMode && (payment <= 0 || cashReceived < payment);
+  }
+}
+
+function setQuickCash(button) {
+  const form = document.querySelector(`#${button.closest('[data-cash-quick-for]').dataset.cashQuickFor}`);
+  const isFine = form.id === 'payment-form';
+  const amount = form.querySelector(isFine ? '#payment-amount' : '#rent-payment-amount');
+  const received = form.querySelector(isFine ? '#payment-cash-received' : '#rent-payment-cash-received');
+  if (button.dataset.cashAmount === 'exact') received.value = amount.value || '';
+  else received.value = button.dataset.cashAmount;
+  received.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function requestConfirmation({ title, content, confirmLabel }) {
+  const dialog = document.querySelector('#action-confirmation');
+  const confirmButton = document.querySelector('#action-confirmation-confirm');
+  document.querySelector('#action-confirmation-title').textContent = title;
+  document.querySelector('#action-confirmation-content').innerHTML = content;
+  confirmButton.textContent = confirmLabel;
+  confirmButton.disabled = false;
+  dialog.showModal();
+  return new Promise(resolve => {
+    let settled = false;
+    const cancelButton = document.querySelector('#action-confirmation-cancel');
+    const closeButton = document.querySelector('#action-confirmation-close');
+    const cleanup = () => {
+      confirmButton.removeEventListener('click', onConfirm);
+      cancelButton.removeEventListener('click', onCancel);
+      closeButton.removeEventListener('click', onCancel);
+      dialog.removeEventListener('cancel', onCancel);
+      dialog.removeEventListener('close', onCancel);
+    };
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (dialog.open) dialog.close();
+      resolve(value);
+    };
+    const onConfirm = () => {
+      confirmButton.disabled = true;
+      confirmButton.textContent = 'Memproses...';
+      finish(true);
+    };
+    const onCancel = () => finish(false);
+    confirmButton.addEventListener('click', onConfirm);
+    cancelButton.addEventListener('click', onCancel);
+    closeButton.addEventListener('click', onCancel);
+    dialog.addEventListener('cancel', onCancel);
+    dialog.addEventListener('close', onCancel);
+  });
+}
+
+function returnConfirmationContent(rental, actualDate) {
+  const plannedDays = Math.max(1, -daysUntil(rental.tgl_sewa, rental.tgl_rencana_kembali));
+  const actualDays = Math.max(1, -daysUntil(rental.tgl_sewa, actualDate));
+  const lateDays = Math.max(0, -daysUntil(rental.tgl_rencana_kembali, actualDate));
+  const perDay = (rental.detail_penyewaan || []).reduce((sum, detail) =>
+    sum + Number(detail.jumlah || 1) * Number(detail.alat_musik?.denda_per_hari || 0), 0);
+  const items = (rental.detail_penyewaan || []).map(detail =>
+    `${detail.jumlah || 1} × ${detail.alat_musik?.nama_alat || 'Alat musik'}`).join(', ') || 'Rincian alat tidak tersedia';
+  return `<dl class="confirmation-summary">
+    <div><dt>Pelanggan</dt><dd>${escapeHtml(rental.pelanggan?.nama || 'Pelanggan')}</dd></div>
+    <div><dt>Alat dikembalikan</dt><dd>${escapeHtml(items)}</dd></div>
+    <div><dt>Durasi rencana / aktual</dt><dd>${plannedDays} / ${actualDays} hari</dd></div>
+    <div><dt>Jatuh tempo / kembali</dt><dd>${formatDate(rental.tgl_rencana_kembali)} / ${formatDate(actualDate)}</dd></div>
+    <div><dt>Keterlambatan</dt><dd>${lateDays} hari</dd></div>
+    <div><dt>Perkiraan denda</dt><dd>${currency.format(lateDays * perDay)} (${currency.format(perDay)} / hari)</dd></div>
+  </dl><p class="confirmation-warning">Tindakan ini akan mengembalikan ketersediaan stok alat dan mencatat piutang denda ke pembukuan.</p>`;
+}
+
+function paymentConfirmationContent({ total, paid, amount, remaining, method, kind }) {
+  return `<dl class="confirmation-summary">
+    <div><dt>Total tagihan ${kind}</dt><dd>${currency.format(total)}</dd></div>
+    <div><dt>Sudah dibayar</dt><dd>${currency.format(paid)}</dd></div>
+    <div><dt>Dibayar sekarang</dt><dd>${currency.format(amount)}</dd></div>
+    <div><dt>Metode</dt><dd>${escapeHtml(method)}</dd></div>
+    <div><dt>Sisa setelah pembayaran</dt><dd>${currency.format(remaining)}</dd></div>
+  </dl><p class="confirmation-warning">Pastikan nominal dan metode pembayaran benar sebelum dicatat.</p>`;
 }
 
 function fillPaymentAmount(type) {
@@ -660,6 +807,7 @@ function fillPaymentAmount(type) {
   document.querySelector('#payment-amount').value = type === 'half'
     ? Math.floor(balance / 2)
     : balance;
+  document.querySelector('#payment-amount').dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function fillRentPaymentAmount(type) {
@@ -669,6 +817,7 @@ function fillRentPaymentAmount(type) {
   document.querySelector('#rent-payment-amount').value = type === 'half'
     ? Math.floor(balance / 2)
     : balance;
+  document.querySelector('#rent-payment-amount').dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function detailLookups() {
@@ -763,13 +912,15 @@ function renderRentalPaymentHistory() {
   const rows = payments.map(payment => `<tr>
     <td>#${payment.id_pembayaran_sewa}</td><td>${formatDate(payment.tgl_bayar)}</td>
     <td>${escapeHtml(payment.metode_bayar)}</td><td class="amount-cell">${currency.format(Number(payment.jumlah_bayar))}</td>
+    <td><button class="record-edit-button" type="button" data-print-receipt="rental-payment" data-receipt-id="${payment.id_pembayaran_sewa}">Cetak struk</button></td>
   </tr>`).join('');
   const legacyNote = rental.basis_pencatatan === 'Kas'
     ? '<small class="field-hint">Tagihan ini berasal dari data sebelum fitur pembayaran sewa. Pembayaran yang dicatat mulai sekarang menggunakan basis kas.</small>'
     : '';
-  container.innerHTML = `<div class="detail-balance">Total ${currency.format(Number(rental.total_biaya))} · Dibayar ${currency.format(paid)} · Sisa ${currency.format(balance)} · ${escapeHtml(rental.status_pembayaran_sewa)}</div>
-    ${legacyNote}<table><thead><tr><th>PEMBAYARAN</th><th>TANGGAL</th><th>METODE</th><th class="amount-cell">NOMINAL</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="4" class="empty-cell">Belum ada pembayaran untuk penyewaan ini.</td></tr>'}</tbody></table>`;
+  container.innerHTML = `<div class="detail-balance">Total ${currency.format(Number(rental.total_biaya))} · Dibayar ${currency.format(paid)} · Sisa ${currency.format(balance)} · ${escapeHtml(rental.status_pembayaran_sewa)}
+    <button class="record-edit-button" type="button" data-print-receipt="rental" data-receipt-id="${rental.id_sewa}">Cetak struk rental</button></div>
+    ${legacyNote}<table><thead><tr><th>PEMBAYARAN</th><th>TANGGAL</th><th>METODE</th><th class="amount-cell">NOMINAL</th><th>BUKTI</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5" class="empty-cell">Belum ada pembayaran untuk penyewaan ini.</td></tr>'}</tbody></table>`;
 }
 
 function renderPaymentHistory() {
@@ -788,10 +939,12 @@ function renderPaymentHistory() {
   const rows = payments.map(payment => `<tr>
     <td>#${payment.id_pembayaran}</td><td>${formatDate(payment.tgl_bayar)}</td>
     <td>${escapeHtml(payment.metode_bayar)}</td><td class="amount-cell">${currency.format(Number(payment.jumlah_bayar))}</td>
+    <td><button class="record-edit-button" type="button" data-print-receipt="fine-payment" data-receipt-id="${payment.id_pembayaran}">Cetak struk</button></td>
   </tr>`).join('');
-  container.innerHTML = `<div class="detail-balance">Total ${currency.format(Number(bill.total_denda))} · Dibayar ${currency.format(paid)} · Sisa ${currency.format(balance)} · ${escapeHtml(bill.status_pembayaran_denda)}</div>
-    <table><thead><tr><th>PEMBAYARAN</th><th>TANGGAL</th><th>METODE</th><th class="amount-cell">NOMINAL</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="4" class="empty-cell">Belum ada pembayaran untuk tagihan ini.</td></tr>'}</tbody></table>`;
+  container.innerHTML = `<div class="detail-balance">Total ${currency.format(Number(bill.total_denda))} · Dibayar ${currency.format(paid)} · Sisa ${currency.format(balance)} · ${escapeHtml(bill.status_pembayaran_denda)}
+    <button class="record-edit-button" type="button" data-print-receipt="return" data-receipt-id="${bill.id_pengembalian}">Cetak struk denda</button></div>
+    <table><thead><tr><th>PEMBAYARAN</th><th>TANGGAL</th><th>METODE</th><th class="amount-cell">NOMINAL</th><th>BUKTI</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5" class="empty-cell">Belum ada pembayaran untuk tagihan ini.</td></tr>'}</tbody></table>`;
 }
 
 function renderCustomerHistory() {
@@ -823,10 +976,111 @@ function renderCustomerHistory() {
         <td>${escapeHtml(names || '—')}</td><td>${escapeHtml(rental.status_sewa)}</td>
         <td class="amount-cell">${currency.format(Number(rental.total_biaya))}</td>
         <td>${escapeHtml(rentStatus)}<small>Sisa ${currency.format(rentBalance)}</small></td>
-        <td>${escapeHtml(fineStatus)}<small>${fine ? `${currency.format(paid)} / ${currency.format(fine)}` : ''}</small></td></tr>`;
+        <td>${escapeHtml(fineStatus)}<small>${fine ? `${currency.format(paid)} / ${currency.format(fine)}` : ''}</small></td>
+        <td class="receipt-actions"><button class="record-edit-button" type="button" data-print-receipt="rental" data-receipt-id="${rental.id_sewa}">Cetak rental</button>
+        ${rentalReturn ? `<button class="record-edit-button" type="button" data-print-receipt="return" data-receipt-id="${rentalReturn.id_pengembalian}">Cetak kembali</button>` : ''}</td></tr>`;
     }).join('');
-  container.innerHTML = `<table><thead><tr><th>PENYEWAAN</th><th>ALAT</th><th>STATUS RENTAL</th><th class="amount-cell">BIAYA SEWA</th><th>STATUS PEMBAYARAN SEWA</th><th>STATUS DENDA</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="6" class="empty-cell">Pelanggan ini belum memiliki riwayat penyewaan.</td></tr>'}</tbody></table>`;
+  container.innerHTML = `<table><thead><tr><th>PENYEWAAN</th><th>ALAT</th><th>STATUS RENTAL</th><th class="amount-cell">BIAYA SEWA</th><th>STATUS PEMBAYARAN SEWA</th><th>STATUS DENDA</th><th>BUKTI</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7" class="empty-cell">Pelanggan ini belum memiliki riwayat penyewaan.</td></tr>'}</tbody></table>`;
+}
+
+function printTransactionReceipt(type, id) {
+  if (!state.detail) return notify('Data transaksi belum dimuat.', true);
+  const { customers, rentals, returns, rentalDetails, equipment, paymentsByReturn, paidByReturn, rentalPaymentsByRental, paidByRental } = detailLookups();
+  let rental;
+  let returnRecord;
+  let currentPayment;
+  let paymentRows = [];
+  let paymentKind = '';
+
+  if (type === 'rental' || type === 'rental-payment') {
+    if (type === 'rental') rental = rentals.get(id);
+    else {
+      currentPayment = state.detail.rentalPayments.find(row => row.id_pembayaran_sewa === id);
+      rental = rentals.get(currentPayment?.id_sewa);
+      paymentKind = 'rental';
+      paymentRows = [...(rentalPaymentsByRental.get(currentPayment?.id_sewa) || [])]
+        .sort((a, b) => a.tgl_bayar.localeCompare(b.tgl_bayar) || a.id_pembayaran_sewa - b.id_pembayaran_sewa);
+    }
+    returnRecord = returns.get(rental?.id_sewa);
+  } else {
+    if (type === 'return') returnRecord = state.detail.returns.find(row => row.id_pengembalian === id);
+    else {
+      currentPayment = state.detail.payments.find(row => row.id_pembayaran === id);
+      returnRecord = state.detail.returns.find(row => row.id_pengembalian === currentPayment?.id_pengembalian);
+      paymentKind = 'fine';
+      paymentRows = [...(paymentsByReturn.get(currentPayment?.id_pengembalian) || [])]
+        .sort((a, b) => a.tgl_bayar.localeCompare(b.tgl_bayar) || a.id_pembayaran - b.id_pembayaran);
+    }
+    rental = rentals.get(returnRecord?.id_sewa);
+  }
+  if (!rental) return notify('Data penyewaan untuk struk ini tidak ditemukan.', true);
+
+  const customer = customers.get(rental.id_pelanggan);
+  const details = rentalDetails.get(rental.id_sewa) || [];
+  const itemRows = details.map(detail => {
+    const item = equipment.get(detail.id_alat);
+    const quantity = Number(detail.jumlah || 1);
+    const rate = Number(item?.harga_sewa_per_hari || 0);
+    const fineRate = Number(item?.denda_per_hari || 0);
+    return `<tr><td>${escapeHtml(item?.nama_alat || 'Alat musik')} × ${quantity}<small>Sewa ${currency.format(rate)} / hari · Denda ${currency.format(fineRate)} / hari</small></td><td class="receipt-number">${currency.format(Number(detail.subtotal || 0))}</td></tr>`;
+  }).join('');
+  const isFine = paymentKind === 'fine' || type === 'return';
+  const total = isFine ? Number(returnRecord?.total_denda || 0) : Number(rental.total_biaya || 0);
+  let paid = isFine
+    ? paidByReturn.get(returnRecord?.id_pengembalian) || 0
+    : paidByRental.get(rental.id_sewa) || 0;
+  if (currentPayment) {
+    const paymentId = isFine ? currentPayment.id_pembayaran : currentPayment.id_pembayaran_sewa;
+    const idField = isFine ? 'id_pembayaran' : 'id_pembayaran_sewa';
+    const currentIndex = paymentRows.findIndex(row => row[idField] === paymentId);
+    paid = paymentRows.slice(0, currentIndex + 1).reduce((sum, row) => sum + Number(row.jumlah_bayar), 0);
+  }
+  const amountNow = Number(currentPayment?.jumlah_bayar || 0);
+  const balance = Math.max(0, total - paid);
+  const paymentStatus = total === 0 && isFine
+    ? 'Tidak ada denda'
+    : balance === 0 ? 'Lunas' : paid > 0 ? 'Sebagian' : 'Belum lunas';
+  const actualDays = Math.max(1, daysUntil(rental.tgl_sewa, rental.tgl_rencana_kembali) * -1);
+  const date = currentPayment?.tgl_bayar || returnRecord?.tgl_kembali_aktual || rental.tgl_sewa;
+  const receiptDate = new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short'
+  }).format(new Date());
+  const receiptType = type === 'return' ? 'BUKTI PENGEMBALIAN'
+    : isFine ? 'KUITANSI PEMBAYARAN DENDA' : type === 'rental' ? 'BUKTI PENYEWAAN' : 'KUITANSI PEMBAYARAN SEWA';
+  const business = window.RITME_BUSINESS_INFO || {};
+  const footerNote = 'Mohon simpan bukti transaksi ini. Pengembalian mengikuti tanggal dan ketentuan pada transaksi sewa.';
+  const paymentLines = [
+    `<div><span>Total ${isFine ? 'denda' : 'sewa'}</span><strong>${currency.format(total)}</strong></div>`,
+    `<div><span>Dibayar saat ini</span><strong>${currency.format(amountNow)}</strong></div>`,
+    `<div><span>Akumulasi dibayar</span><strong>${currency.format(paid)}</strong></div>`,
+    `<div><span>Metode</span><strong>${escapeHtml(currentPayment?.metode_bayar || '—')}</strong></div>`,
+    `<div><span>Status</span><strong>${escapeHtml(paymentStatus)}${balance ? ` · Sisa ${currency.format(balance)}` : ''}</strong></div>`
+  ].join('');
+  const fineLine = returnRecord
+    ? `<tr><td>Denda keterlambatan · ${Number(returnRecord.hari_terlambat)} hari</td><td class="receipt-number">${currency.format(Number(returnRecord.total_denda))}</td></tr>`
+    : '';
+  const container = document.querySelector('#receipt-print-container');
+  container.innerHTML = `<article class="receipt">
+    <header class="receipt-header"><strong>Ritme</strong><span>RENTAL MUSIK</span><h1>${receiptType}</h1></header>
+    <div class="receipt-meta"><span>No. transaksi</span><strong>${isFine ? `D-${returnRecord?.id_pengembalian}` : `S-${rental.id_sewa}`}</strong><span>Tanggal</span><strong>${formatDate(date)}</strong></div>
+    <section class="receipt-customer"><strong>${escapeHtml(customer?.nama || 'Pelanggan')}</strong><span>${escapeHtml(customer?.no_hp || 'Nomor HP tidak tersedia')}</span></section>
+    <table class="receipt-items"><thead><tr><th>RINCIAN</th><th class="receipt-number">JUMLAH</th></tr></thead>
+      <tbody>${itemRows || '<tr><td>Alat musik</td><td class="receipt-number">—</td></tr>'}${fineLine}</tbody></table>
+    <p class="receipt-duration">Durasi sewa rencana: ${actualDays} hari · Rencana kembali: ${formatDate(rental.tgl_rencana_kembali)}${returnRecord ? ` · Aktual: ${formatDate(returnRecord.tgl_kembali_aktual)}` : ''}</p>
+    <section class="receipt-payment">${paymentLines}</section>
+    <footer><p>${escapeHtml(business.address || 'Alamat usaha belum diatur')}</p><p>Kontak: ${escapeHtml(business.phone || 'Belum diatur')}</p><p>Dicetak ${escapeHtml(receiptDate)}</p><p>${footerNote}</p><strong>Terima kasih telah memilih Ritme.</strong></footer>
+  </article>`;
+  document.body.classList.add('printing-receipt');
+  container.hidden = false;
+  const cleanup = () => {
+    document.body.classList.remove('printing-receipt');
+    container.hidden = true;
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  window.print();
+  window.setTimeout(cleanup, 1000);
 }
 
 function renderEquipmentReport() {
@@ -1324,10 +1578,28 @@ function initializeApplication() {
   document.querySelectorAll('[data-rent-payment-amount]').forEach(button => button.addEventListener('click', () => {
     fillRentPaymentAmount(button.dataset.rentPaymentAmount);
   }));
+  document.querySelectorAll('[data-cash-quick-for] [data-cash-amount]').forEach(button =>
+    button.addEventListener('click', () => setQuickCash(button)));
+  [
+    ['payment-form', '#payment-amount', '#payment-cash-received', '#payment-method'],
+    ['rent-payment-form', '#rent-payment-amount', '#rent-payment-cash-received', '#rent-payment-method']
+  ].forEach(([formId, amountSelector, receivedSelector, methodSelector]) => {
+    const form = document.querySelector(`#${formId}`);
+    [amountSelector, receivedSelector, methodSelector].forEach(selector =>
+      form.querySelector(selector).addEventListener('input', () => updateCashChange(formId)));
+    form.querySelector(methodSelector).addEventListener('change', () => updateCashChange(formId));
+  });
+  document.addEventListener('click', event => {
+    const button = event.target.closest('[data-print-receipt]');
+    if (button) printTransactionReceipt(button.dataset.printReceipt, Number(button.dataset.receiptId));
+  });
   document.querySelector('#download-csv').addEventListener('click', exportJournals);
   document.querySelector('#record-editor-form').addEventListener('submit', saveRecordEdit);
   document.querySelector('#record-editor-cancel').addEventListener('click', () => document.querySelector('#record-editor').close());
   document.querySelector('#record-editor-close').addEventListener('click', () => document.querySelector('#record-editor').close());
+  document.querySelector('#action-confirmation').addEventListener('click', event => {
+    if (event.target === event.currentTarget) event.currentTarget.close();
+  });
   document.querySelectorAll('#customer-list, #equipment-report').forEach(container => {
     container.addEventListener('click', event => {
       const button = event.target.closest('[data-edit-record]');
@@ -1417,8 +1689,18 @@ function initializeApplication() {
   document.querySelector('#return-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget;
-    if (form.dataset.submitting === 'true') return;
-    if (!window.confirm('Catat pengembalian ini? Status alat dan penyewaan akan diperbarui otomatis.')) return;
+    if (form.dataset.submitting === 'true' || form.dataset.confirming === 'true') return;
+    const rental = state.rentals.find(item => String(item.id_sewa) === document.querySelector('#return-rental').value);
+    if (!rental) return notify('Pilih penyewaan aktif yang valid.', true);
+    const actualDate = document.querySelector('#actual-date').value;
+    form.dataset.confirming = 'true';
+    const confirmed = await requestConfirmation({
+      title: 'Konfirmasi pengembalian',
+      content: returnConfirmationContent(rental, actualDate),
+      confirmLabel: 'Ya, proses pengembalian'
+    });
+    form.dataset.confirming = 'false';
+    if (!confirmed) return;
     form.dataset.submitting = 'true';
     setBusy(form, true);
     try {
@@ -1443,13 +1725,31 @@ function initializeApplication() {
   document.querySelector('#payment-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget;
-    if (form.dataset.submitting === 'true') return;
+    if (form.dataset.submitting === 'true' || form.dataset.confirming === 'true') return;
     const amount = Number(document.querySelector('#payment-amount').value);
     const selected = state.unpaid.find(item => String(item.id_pengembalian) === document.querySelector('#payment-return').value);
     if (!selected || !Number.isFinite(amount) || amount <= 0) return notify('Pilih tagihan dan masukkan nominal cicilan yang valid.', true);
     if (amount > selected.sisa_denda) return notify('Jumlah pembayaran melebihi sisa denda.', true);
+    if (document.querySelector('#payment-method').value === 'Tunai'
+      && Number(document.querySelector('#payment-cash-received').value) < amount) {
+      return notify('Uang tunai yang diterima masih kurang dari nominal pembayaran.', true);
+    }
     const remaining = selected.sisa_denda - amount;
-    if (!window.confirm(`Catat pembayaran denda sebesar ${currency.format(amount)}?`)) return;
+    form.dataset.confirming = 'true';
+    const confirmed = await requestConfirmation({
+      title: 'Konfirmasi pembayaran denda',
+      content: paymentConfirmationContent({
+        total: selected.total_denda,
+        paid: selected.total_terbayar,
+        amount,
+        remaining,
+        method: document.querySelector('#payment-method').value,
+        kind: 'denda'
+      }),
+      confirmLabel: 'Ya, simpan pembayaran'
+    });
+    form.dataset.confirming = 'false';
+    if (!confirmed) return;
     form.dataset.submitting = 'true';
     setBusy(form, true);
     try {
@@ -1471,13 +1771,14 @@ function initializeApplication() {
     } finally {
       form.dataset.submitting = 'false';
       setBusy(form, false);
+      updateCashChange('payment-form');
     }
   });
 
   document.querySelector('#rent-payment-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget;
-    if (form.dataset.submitting === 'true') return;
+    if (form.dataset.submitting === 'true' || form.dataset.confirming === 'true') return;
     const idSewa = document.querySelector('#payment-rental').value;
     const amount = Number(document.querySelector('#rent-payment-amount').value);
     const selected = state.rentUnpaid.find(item => String(item.id_sewa) === idSewa);
@@ -1485,8 +1786,26 @@ function initializeApplication() {
       return notify('Pilih tagihan sewa dan masukkan nominal pembayaran yang valid.', true);
     }
     if (amount > selected.sisa_tagihan) return notify('Jumlah pembayaran melebihi sisa tagihan sewa.', true);
+    if (document.querySelector('#rent-payment-method').value === 'Tunai'
+      && Number(document.querySelector('#rent-payment-cash-received').value) < amount) {
+      return notify('Uang tunai yang diterima masih kurang dari nominal pembayaran.', true);
+    }
     const remaining = selected.sisa_tagihan - amount;
-    if (!window.confirm(`Catat pembayaran sewa sebesar ${currency.format(amount)}?`)) return;
+    form.dataset.confirming = 'true';
+    const confirmed = await requestConfirmation({
+      title: 'Konfirmasi pembayaran sewa',
+      content: paymentConfirmationContent({
+        total: selected.total_biaya,
+        paid: selected.total_terbayar,
+        amount,
+        remaining,
+        method: document.querySelector('#rent-payment-method').value,
+        kind: 'sewa'
+      }),
+      confirmLabel: 'Ya, simpan pembayaran'
+    });
+    form.dataset.confirming = 'false';
+    if (!confirmed) return;
     form.dataset.submitting = 'true';
     setBusy(form, true);
     try {
@@ -1508,6 +1827,7 @@ function initializeApplication() {
     } finally {
       form.dataset.submitting = 'false';
       setBusy(form, false);
+      updateCashChange('rent-payment-form');
     }
   });
 

@@ -639,3 +639,60 @@ input:focus, select:focus { box-shadow: 0 0 0 3px #2864e81a; }
   .instrument-art.instrument-photo { width: 58px; height: 50px; flex-basis: 58px; }
   .equipment-option { gap: 7px; padding: 7px; }
 }
+
+.due-alert { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding: 13px 15px; border: 1px solid #f0c974; border-radius: 10px; background: #fff8e8; color: #794c08; }
+.due-alert-icon { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #f7dfaa; font-weight: 800; }
+.due-alert > div { flex: 1; }
+.due-alert strong, .due-alert small { display: block; }
+.due-alert small { margin-top: 3px; color: #8a6c35; font-size: 11px; }
+.whatsapp-reminder { min-height: 30px; border-color: #b7dfc2; background: #effaf2; color: #247044; text-decoration: none; }
+.whatsapp-reminder:hover { background: #e0f5e6; }
+.cash-quick-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: -3px; }
+.cash-quick-actions .payment-quick-button { min-height: 30px; padding: 0 5px; font-size: 9px; }
+.cash-feedback.is-error { color: #b42318; font-weight: 700; }
+.cash-feedback.is-success { color: #217145; font-weight: 700; }
+.action-confirmation { width: min(520px, calc(100% - 28px)); max-height: min(88vh, 760px); padding: 23px; overflow-y: auto; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); box-shadow: 0 24px 80px #172b4d30; }
+.action-confirmation::backdrop { background: #101a2b70; backdrop-filter: blur(3px); }
+.action-confirmation .panel-heading { margin-bottom: 18px; }
+.confirmation-summary { display: grid; gap: 0; margin: 0; }
+.confirmation-summary > div { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(0, 1.2fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.confirmation-summary dt { color: var(--muted); font-size: 11px; }
+.confirmation-summary dd { margin: 0; color: var(--ink); font-size: 12px; font-weight: 700; text-align: right; }
+.confirmation-warning { margin: 16px 0 0; padding: 12px; border-left: 3px solid #e0ab3e; background: #fff8e8; color: #71551d; font-size: 11px; line-height: 1.55; }
+.receipt-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.receipt { width: min(100%, 74mm); margin: 0 auto; padding: 4mm; color: #111; font: 10px/1.45 Arial, sans-serif; }
+.receipt-header { display: grid; justify-items: center; gap: 2px; padding-bottom: 9px; border-bottom: 1px dashed #555; text-align: center; }
+.receipt-header > strong { font-size: 20px; letter-spacing: .5px; }
+.receipt-header > span { font-size: 9px; letter-spacing: 1.2px; }
+.receipt-header h1 { margin: 7px 0 0; font-size: 12px; }
+.receipt-meta { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; padding: 9px 0; }
+.receipt-meta span, .receipt-customer span { color: #555; }
+.receipt-customer { display: grid; gap: 2px; padding: 8px 0; border-top: 1px dashed #777; }
+.receipt-items { margin: 8px 0; border-top: 1px dashed #777; border-bottom: 1px dashed #777; }
+.receipt-items th { padding: 6px 2px; color: #333; font-size: 8px; }
+.receipt-items td { padding: 6px 2px; border: 0; color: #111; font-size: 9px; vertical-align: top; }
+.receipt-items td small { color: #555; font: 8px Arial, sans-serif; }
+.receipt-number { text-align: right; white-space: nowrap; }
+.receipt-duration { margin: 7px 0; color: #444; font-size: 8px; }
+.receipt-payment { padding: 7px 0; border-top: 1px dashed #777; }
+.receipt-payment > div { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+.receipt-payment > div > span { color: #444; }
+.receipt footer { padding-top: 8px; border-top: 1px dashed #777; text-align: center; }
+.receipt footer p { margin: 3px 0; }
+.receipt footer strong { display: block; margin-top: 8px; }
+@media print {
+  @page { size: auto; margin: 4mm; }
+  body.printing-receipt { min-width: 0; margin: 0; background: #fff; }
+  body.printing-receipt > :not(#receipt-print-container) { display: none !important; }
+  body.printing-receipt #receipt-print-container { display: block !important; width: 100%; margin: 0; padding: 0; background: #fff; }
+  body.printing-receipt .receipt { width: 74mm; max-width: 100%; margin: 0 auto; padding: 0; color: #000; }
+  body.printing-receipt .receipt * { color: #000 !important; box-shadow: none !important; }
+}
+
+@media (max-width: 560px) {
+  .due-alert { align-items: flex-start; flex-wrap: wrap; padding: 11px; }
+  .due-alert .button { margin-left: 39px; }
+  .cash-quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .confirmation-summary > div { grid-template-columns: 1fr; gap: 4px; }
+  .confirmation-summary dd { text-align: left; }
+}

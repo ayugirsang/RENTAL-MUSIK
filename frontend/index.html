@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=admin-auth-1">
+  <link rel="stylesheet" href="css/style.css?v=operational-v1">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase.js"></script>
-  <script src="js/app.js?v=admin-auth-1" defer></script>
+  <script src="js/app.js?v=operational-v1" defer></script>
 </head>
 <body>
   <section class="auth-gate" id="auth-gate" aria-labelledby="auth-title">
@@ -81,6 +81,11 @@
             <img src="img/instruments/drums.jpg" alt="Set drum akustik" loading="lazy">
           </div>
         </section>
+        <section class="due-alert" id="due-alert" aria-live="polite" hidden>
+          <span class="due-alert-icon" aria-hidden="true">!</span>
+          <div><strong id="due-alert-title">Perhatian: 0 transaksi perlu tindakan hari ini</strong><small id="due-alert-detail">Jatuh tempo hari ini atau terlambat.</small></div>
+          <button class="button button-outline button-small" type="button" data-go="transactions">Lihat rental</button>
+        </section>
         <div class="metric-grid">
           <article class="metric metric-green"><div class="metric-top"><span>Pendapatan bulan ini</span><span class="metric-icon">↗</span></div><strong id="metric-month-revenue">Rp0</strong><div class="metric-foot">Sewa dan denda yang diakui</div></article>
           <article class="metric metric-paper"><div class="metric-top"><span>Kas masuk bulan ini</span><span class="metric-icon">Rp</span></div><strong id="metric-month-cash">Rp0</strong><div class="metric-foot">Pembayaran sewa dan denda</div></article>
@@ -98,7 +103,7 @@
               <button class="dashboard-filter" type="button" data-rental-filter="soon" aria-pressed="false">Segera <span id="count-due-soon">0</span></button>
               <button class="dashboard-filter" type="button" data-rental-filter="late" aria-pressed="false">Terlambat <span id="count-late">0</span></button>
             </div>
-            <div class="table-wrap"><table><thead><tr><th>PELANGGAN / RENTAL</th><th>JATUH TEMPO</th><th>NILAI SEWA</th><th>STATUS</th></tr></thead><tbody id="due-table"><tr><td colspan="4" class="empty-cell">Memuat data...</td></tr></tbody></table></div>
+            <div class="table-wrap"><table><thead><tr><th>PELANGGAN / RENTAL</th><th>JATUH TEMPO</th><th>NILAI SEWA</th><th>STATUS</th><th>AKSI</th></tr></thead><tbody id="due-table"><tr><td colspan="5" class="empty-cell">Memuat data...</td></tr></tbody></table></div>
             <div id="due-caption" class="due-caption">Pengingat jatuh tempo mencakup hari ini hingga 3 hari ke depan.</div>
           </section>
           <aside class="note-panel seller-followup">
@@ -159,6 +164,11 @@
                 <div class="field-pair"><div><label class="field-label" for="payment-date">Tanggal bayar</label><input id="payment-date" type="date" required></div><div><label class="field-label" for="payment-method">Metode</label><select id="payment-method" required><option value="Tunai">Tunai</option><option value="Transfer">Transfer</option><option value="QRIS">QRIS</option></select></div></div>
                 <div id="payment-summary" class="payment-summary" aria-live="polite" hidden></div>
                 <label class="field-label" for="payment-amount">Jumlah dibayar (Rp) <span class="required">*</span></label><input id="payment-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="0" required>
+                <label class="field-label" for="payment-cash-received">Uang diterima (Rp)</label><input id="payment-cash-received" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required>
+                <div class="cash-quick-actions" data-cash-quick-for="payment-form">
+                  <button class="payment-quick-button" type="button" data-cash-amount="exact">Uang pas</button><button class="payment-quick-button" type="button" data-cash-amount="50000">Rp 50.000</button><button class="payment-quick-button" type="button" data-cash-amount="100000">Rp 100.000</button><button class="payment-quick-button" type="button" data-cash-amount="200000">Rp 200.000</button>
+                </div>
+                <small class="cash-feedback field-hint" id="payment-cash-feedback" aria-live="polite">Pilih tagihan dan masukkan jumlah uang diterima.</small>
                 <div class="payment-quick-actions"><button class="payment-quick-button" type="button" data-payment-amount="half" disabled>Isi setengah sisa</button><button class="payment-quick-button" type="button" data-payment-amount="balance" disabled>Isi sisa denda</button></div>
                 <small id="payment-balance" class="field-hint" aria-live="polite">Pilih tagihan untuk melihat sisa denda.</small>
                 <button class="button button-yellow button-wide" type="submit">Simpan pembayaran <span>→</span></button>
@@ -170,6 +180,11 @@
                 <div class="field-pair"><div><label class="field-label" for="rent-payment-date">Tanggal bayar</label><input id="rent-payment-date" type="date" required></div><div><label class="field-label" for="rent-payment-method">Metode</label><select id="rent-payment-method" required><option value="Tunai">Tunai</option><option value="Transfer">Transfer</option><option value="QRIS">QRIS</option></select></div></div>
                 <div id="rent-payment-summary" class="payment-summary" aria-live="polite" hidden></div>
                 <label class="field-label" for="rent-payment-amount">Jumlah dibayar (Rp) <span class="required">*</span></label><input id="rent-payment-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="0" required>
+                <label class="field-label" for="rent-payment-cash-received">Uang diterima (Rp)</label><input id="rent-payment-cash-received" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required>
+                <div class="cash-quick-actions" data-cash-quick-for="rent-payment-form">
+                  <button class="payment-quick-button" type="button" data-cash-amount="exact">Uang pas</button><button class="payment-quick-button" type="button" data-cash-amount="50000">Rp 50.000</button><button class="payment-quick-button" type="button" data-cash-amount="100000">Rp 100.000</button><button class="payment-quick-button" type="button" data-cash-amount="200000">Rp 200.000</button>
+                </div>
+                <small class="cash-feedback field-hint" id="rent-payment-cash-feedback" aria-live="polite">Pilih tagihan dan masukkan jumlah uang diterima.</small>
                 <div class="payment-quick-actions"><button class="payment-quick-button" type="button" data-rent-payment-amount="half" disabled>Isi setengah sisa</button><button class="payment-quick-button" type="button" data-rent-payment-amount="balance" disabled>Isi sisa tagihan</button></div>
                 <small id="rent-payment-balance" class="field-hint" aria-live="polite">Pilih tagihan untuk melihat sisa pembayaran.</small>
                 <button class="button button-dark button-wide" type="submit">Simpan pembayaran sewa <span>→</span></button>
@@ -270,8 +285,19 @@
           </div>
         </form>
       </dialog>
+      <dialog class="action-confirmation" id="action-confirmation" aria-labelledby="action-confirmation-title">
+        <div class="panel-heading"><div><div class="eyebrow">KONFIRMASI TINDAKAN</div><h2 id="action-confirmation-title">Periksa kembali</h2></div>
+          <button class="record-editor-close" id="action-confirmation-close" type="button" aria-label="Tutup">×</button>
+        </div>
+        <div class="confirmation-content" id="action-confirmation-content"></div>
+        <div class="record-editor-actions">
+          <button class="button button-outline" id="action-confirmation-cancel" type="button">Periksa kembali</button>
+          <button class="button button-dark" id="action-confirmation-confirm" type="button">Ya, lanjutkan</button>
+        </div>
+      </dialog>
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
     </main>
   </div>
+  <section id="receipt-print-container" aria-label="Struk transaksi" hidden></section>
 </body>
 </html>
